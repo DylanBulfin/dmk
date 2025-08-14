@@ -12,6 +12,18 @@ pub struct Duration {
     nanoseconds: u64,
 }
 
+impl Duration {
+    pub fn from_micros(micros: u64) -> Self {
+        Self {
+            nanoseconds: micros * 1000,
+        }
+    }
+
+    pub fn micros(&self) -> u64 {
+        self.nanoseconds / 1000
+    }
+}
+
 impl Add<Duration> for Instant {
     type Output = Self;
 
