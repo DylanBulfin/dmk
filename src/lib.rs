@@ -1,112 +1,279 @@
-use std::marker::PhantomData;
+#![no_std]
+
+pub mod timer;
 
 pub struct KeyState {}
-pub enum Key {}
-pub struct Timer {}
 
-pub trait Behavior {
-    type Func;
-
-    fn call(&mut self, ks: &KeyState) -> BehaviorResult;
-}
-
-pub struct ImmediateBehavior<F>
-where
-    F: FnOnce(&KeyState) -> Vec<Key>,
-{
-    f: Option<F>,
-}
-
-impl<F> Behavior for ImmediateBehavior<F>
-where
-    F: FnOnce(&KeyState) -> Vec<Key>,
-{
-    type Func = F;
-
-    fn call(&mut self, ks: &KeyState) -> BehaviorResult {
-        BehaviorResult {
-            keys: (self
-                .f
-                .take()
-                .expect("Call on already-used ImmediateBehavior"))(ks),
-            timer: None,
-        }
-    }
-}
-
-pub struct DelayedBehavior<F>
-where
-    F: FnOnce(&KeyState) -> Vec<Key>,
-{
-    state: DelayedBehaviorState,
-    init: Option<F>,
-    timer: Option<Timer>,
-    callback: Option<F>,
-}
-
-impl<F> DelayedBehavior<F>
-where
-    F: FnOnce(&KeyState) -> Vec<Key>,
-{
-    pub fn new(init: F, timer: Timer, callback: F) -> Self {
-        Self {
-            state: DelayedBehaviorState::Init,
-            init: Some(init),
-            timer: Some(timer),
-            callback: Some(callback),
-        }
-    }
+#[derive(Debug, PartialEq, Eq)]
+enum Key {
+    A,
+    B,
 }
 
 #[derive(Debug, PartialEq, Eq)]
-enum DelayedBehaviorState {
-    Init,
-    Delaying,
-    Finished,
+pub enum KeyEvent {
+    KeyUp(Key),
+    KeyDown(Key),
+    None,
 }
 
-impl<F> Behavior for DelayedBehavior<F>
-where
-    F: FnOnce(&KeyState) -> Vec<Key>,
-{
-    type Func = F;
+#[derive(Clone, Debug)]
+pub struct Duration {}
 
-    fn call(&mut self, ks: &KeyState) -> BehaviorResult {
-        match self.state {
-            DelayedBehaviorState::Init => {
-                self.state = DelayedBehaviorState::Delaying;
-                BehaviorResult {
-                    keys: self.init.take().map(|i| i(ks)).unwrap_or_default(),
-                    timer: self.timer.take(),
-                }
-            }
-            DelayedBehaviorState::Delaying => {
-                self.state = DelayedBehaviorState::Finished;
-                BehaviorResult {
-                    keys: (self
-                        .callback
-                        .take()
-                        .expect("State mismatch: state = Delaying, but callback is None"))(
-                        ks
-                    ),
-                    timer: None,
-                }
-            }
-            DelayedBehaviorState::Finished => {
-                panic!("Unexpected call on finished DelayedBehavior")
-            }
+pub trait Behavior<I>
+where
+    I: Iterator<Item = KeyEvent>,
+{
+    fn call(&mut self, ks: &KeyState) -> BehaviorResult<I>;
+}
+
+pub struct ImmediateBehavior<F, D, I>
+where
+    F: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    callback: Option<F>,
+    data: D,
+}
+
+impl<F, D, I> ImmediateBehavior<F, D, I>
+where
+    F: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    pub fn new(callback: F, data: D) -> Self {
+        Self {
+            callback: Some(callback),
+            data,
         }
     }
 }
 
-pub struct CyclicBehavior
-
-pub struct BehaviorResult {
-    pub keys: Vec<Key>,
-    pub timer: Option<Timer>,
+impl<F, D, I> Behavior<I> for ImmediateBehavior<F, D, I>
+where
+    F: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    fn call(&mut self, ks: &KeyState) -> BehaviorResult<I> {
+        match self.callback.take() {
+            Some(f) => BehaviorResult {
+                keys: f(&mut self.data, ks),
+                duration: None,
+            },
+            _ => panic!("ImmediateBehavior function is None"),
+        }
+    }
 }
 
+pub struct DelayedBehavior<FI, FC, I, D>
+where
+    FI: FnOnce(&mut D, &KeyState) -> I,
+    FC: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    init: Option<FI>,
+    duration: Option<Duration>,
+    callback: Option<FC>,
+    data: D,
+}
+
+impl<FI, FC, I, D> DelayedBehavior<FI, FC, I, D>
+where
+    FI: FnOnce(&mut D, &KeyState) -> I,
+    FC: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    pub fn new(init: FI, timer: Duration, callback: FC, data: D) -> Self {
+        Self {
+            init: Some(init),
+            duration: Some(timer),
+            callback: Some(callback),
+            data,
+        }
+    }
+}
+
+impl<FI, FC, I, D> Behavior<I> for DelayedBehavior<FI, FC, I, D>
+where
+    FI: FnOnce(&mut D, &KeyState) -> I,
+    FC: FnOnce(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    fn call(&mut self, ks: &KeyState) -> BehaviorResult<I> {
+        if let Some(f) = self.init.take() {
+            // Initial call
+            BehaviorResult {
+                keys: f(&mut self.data, ks),
+                duration: self.duration.take(),
+            }
+        } else if let Some(f) = self.callback.take() {
+            // Delayed call
+            BehaviorResult {
+                keys: f(&mut self.data, ks),
+                duration: None,
+            }
+        } else {
+            panic!("Both init and callback functions are None for DelayedBehavior")
+        }
+    }
+}
+
+pub struct CyclicBehavior<F, D, I>
+where
+    F: FnMut(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    callback: F,
+    duration: Duration,
+    data: D,
+}
+
+impl<F, D, I> CyclicBehavior<F, D, I>
+where
+    F: FnMut(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    pub fn new(callback: F, timer: Duration, data: D) -> Self {
+        Self {
+            callback,
+            duration: timer,
+            data,
+        }
+    }
+}
+
+impl<F, D, I> Behavior<I> for CyclicBehavior<F, D, I>
+where
+    F: FnMut(&mut D, &KeyState) -> I,
+    I: Iterator<Item = KeyEvent>,
+{
+    fn call(&mut self, ks: &KeyState) -> BehaviorResult<I> {
+        BehaviorResult {
+            keys: (self.callback)(&mut self.data, ks),
+            duration: Some(self.duration.clone()),
+        }
+    }
+}
+
+pub struct BehaviorResult<I>
+where
+    I: Iterator<Item = KeyEvent>,
+{
+    pub keys: I,
+    pub duration: Option<Duration>,
+}
+
+// These mostly just test that you can sensibly create and use behaviors
 #[cfg(test)]
 mod tests {
+    use crate::timer::Timer;
+
     use super::*;
+
+    #[test]
+    fn test_immediate_behavior() {
+        let f = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let mut ib = ImmediateBehavior::new(f, '1');
+
+        let BehaviorResult {
+            mut keys,
+            duration: timer,
+        } = ib.call(&KeyState {});
+
+        assert_eq!(keys.next(), Some(KeyEvent::KeyUp(Key::A)));
+        assert_eq!(keys.next(), None);
+        assert!(timer.is_none());
+    }
+
+    #[test]
+    #[should_panic(expected = "ImmediateBehavior function is None")]
+    fn test_call_immediate_twice_panic() {
+        let f = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let mut ib = ImmediateBehavior::new(f, '1');
+
+        let _ = ib.call(&KeyState {});
+        let _ = ib.call(&KeyState {});
+    }
+
+    #[test]
+    fn test_delayed_behavior() {
+        let init = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let callback = |d: &mut char, _ks: &KeyState| {
+            *d = 'B';
+            [KeyEvent::KeyUp(Key::B)].into_iter()
+        };
+        let mut db = DelayedBehavior::new(init, Duration {}, callback, '1');
+
+        // Test call of init
+        let BehaviorResult {
+            mut keys,
+            duration: timer,
+        } = db.call(&KeyState {});
+
+        assert_eq!(keys.next(), Some(KeyEvent::KeyUp(Key::A)));
+        assert_eq!(keys.next(), None);
+        assert!(timer.is_some());
+        assert!(db.init.is_none());
+        assert_eq!(db.data, 'A');
+
+        // Test call of main callback
+        let BehaviorResult {
+            mut keys,
+            duration: timer,
+        } = db.call(&KeyState {});
+        assert_eq!(keys.next(), Some(KeyEvent::KeyUp(Key::B)));
+        assert_eq!(keys.next(), None);
+        assert!(timer.is_none());
+        assert!(db.init.is_none());
+        assert!(db.callback.is_none());
+        assert!(db.duration.is_none());
+        assert_eq!(db.data, 'B');
+    }
+
+    #[test]
+    #[should_panic(expected = "Both init and callback functions are None for DelayedBehavior")]
+    fn test_call_delayed_thrice_panic() {
+        let init = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let callback = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let mut db = DelayedBehavior::new(init, Duration {}, callback, '1');
+
+        let _ = db.call(&KeyState {});
+        let _ = db.call(&KeyState {});
+        let _ = db.call(&KeyState {});
+    }
+
+    #[test]
+    fn test_cyclic_behavior() {
+        let callback = |d: &mut char, _ks: &KeyState| {
+            *d = 'A';
+            [KeyEvent::KeyUp(Key::A)].into_iter()
+        };
+        let mut cb = CyclicBehavior::new(callback, Duration {}, '1');
+
+        for _ in 1..=10 {
+            let BehaviorResult {
+                mut keys,
+                duration: timer,
+            } = cb.call(&KeyState {});
+            assert_eq!(keys.next(), Some(KeyEvent::KeyUp(Key::A)));
+            assert_eq!(keys.next(), None);
+            assert!(timer.is_some());
+            assert_eq!(cb.data, 'A');
+        }
+    }
 }
