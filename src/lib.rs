@@ -6,53 +6,58 @@ pub struct Timer {}
 
 pub trait Behavior {
     type Func;
-    type Arg;
 
     fn call(&mut self, ks: &KeyState) -> BehaviorResult;
 }
 
-pub struct ImmediateBehavior<F, A>
+pub struct ImmediateBehavior<F>
 where
-    F: FnOnce(&KeyState, A) -> Vec<Key>,
+    F: FnOnce(&KeyState) -> Vec<Key>,
 {
     f: Option<F>,
-    a: A,
 }
 
-impl<F, A> Behavior for ImmediateBehavior<F, A>
+impl<F> Behavior for ImmediateBehavior<F>
 where
-    F: FnOnce(&KeyState, A) -> Vec<Key>,
+    F: FnOnce(&KeyState) -> Vec<Key>,
 {
     type Func = F;
-    type Arg = A;
 
     fn call(&mut self, ks: &KeyState) -> BehaviorResult {
         BehaviorResult {
             keys: (self
                 .f
                 .take()
-                .expect("Call on already-used ImmediateBehavior"))(k, a),
+                .expect("Call on already-used ImmediateBehavior"))(ks),
             timer: None,
         }
     }
 }
 
-pub struct DelayedBehavior<F, A>
+pub struct DelayedBehavior<F>
 where
-    F: FnOnce(&KeyState, A) -> Vec<Key>,
+    F: FnOnce(&KeyState) -> Vec<Key>,
 {
     state: DelayedBehaviorState,
     init: Option<F>,
     timer: Option<Timer>,
     callback: Option<F>,
-    a: A,
 }
 
-// impl<F, A> DelayedBehavior<F, A> where
-//     F: FnOnce(&KeyState, A) -> Vec<Key>,{
-//         pub fn new(f: F)
-//     }
-//
+impl<F> DelayedBehavior<F>
+where
+    F: FnOnce(&KeyState) -> Vec<Key>,
+{
+    pub fn new(init: F, timer: Timer, callback: F) -> Self {
+        Self {
+            state: DelayedBehaviorState::Init,
+            init: Some(init),
+            timer: Some(timer),
+            callback: Some(callback),
+        }
+    }
+}
+
 #[derive(Debug, PartialEq, Eq)]
 enum DelayedBehaviorState {
     Init,
@@ -60,34 +65,41 @@ enum DelayedBehaviorState {
     Finished,
 }
 
-impl<F, A> Behavior for DelayedBehavior<F, A>
+impl<F> Behavior for DelayedBehavior<F>
 where
-    F: FnOnce(&KeyState, A) -> Vec<Key>,
+    F: FnOnce(&KeyState) -> Vec<Key>,
 {
     type Func = F;
-    type Arg = A;
 
     fn call(&mut self, ks: &KeyState) -> BehaviorResult {
         match self.state {
-            DelayedBehaviorState::Init => BehaviorResult {
-                keys: self.init.take().map(|i| i(ks, self.a)).unwrap_or_default(),
-                timer: self.timer.take(),
-            },
-            DelayedBehaviorState::Delaying => BehaviorResult {
-                keys: (self
-                    .callback
-                    .take()
-                    .expect("State mismatch: state = Delaying, but callback is None"))(
-                    ks, self.a
-                ),
-                timer: None,
-            },
+            DelayedBehaviorState::Init => {
+                self.state = DelayedBehaviorState::Delaying;
+                BehaviorResult {
+                    keys: self.init.take().map(|i| i(ks)).unwrap_or_default(),
+                    timer: self.timer.take(),
+                }
+            }
+            DelayedBehaviorState::Delaying => {
+                self.state = DelayedBehaviorState::Finished;
+                BehaviorResult {
+                    keys: (self
+                        .callback
+                        .take()
+                        .expect("State mismatch: state = Delaying, but callback is None"))(
+                        ks
+                    ),
+                    timer: None,
+                }
+            }
             DelayedBehaviorState::Finished => {
                 panic!("Unexpected call on finished DelayedBehavior")
             }
         }
     }
 }
+
+pub struct CyclicBehavior
 
 pub struct BehaviorResult {
     pub keys: Vec<Key>,
