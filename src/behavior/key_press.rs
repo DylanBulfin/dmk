@@ -1,7 +1,7 @@
 use crate::{
     behavior::Behavior,
     evec,
-    event::{EVec, Key, KeyEvent},
+    event::{EVec, Event, Key, KeyEvent},
     timer::Duration,
 };
 
@@ -11,11 +11,11 @@ pub struct KeyPressBehavior {
 
 impl Behavior for KeyPressBehavior {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
-        evec![KeyEvent::KeyDown(self.key).into()]
+        evec![Event::key_down(self.key)]
     }
 
     fn on_release(&mut self, _ks: &super::KeyState) -> EVec {
-        evec![KeyEvent::KeyUp(self.key).into()]
+        evec![Event::key_up(self.key)]
     }
 
     fn try_get_delay(&self) -> Option<Duration> {
