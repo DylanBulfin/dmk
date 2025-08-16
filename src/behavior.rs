@@ -1,8 +1,8 @@
+pub mod hold_tap;
 pub mod key_press;
-pub mod mod_tap;
 
 use crate::{
-    behavior::{key_press::KeyPress, mod_tap::HoldTap},
+    behavior::{hold_tap::HoldTap, key_press::KeyPress},
     event::{EVec, Event},
     timer::Duration,
 };
@@ -23,4 +23,16 @@ pub trait Behavior {
 pub enum DefaultBehavior {
     HoldTap(HoldTap),
     KeyPress(KeyPress),
+}
+
+impl From<HoldTap> for DefaultBehavior {
+    fn from(value: HoldTap) -> Self {
+        Self::HoldTap(value)
+    }
+}
+
+impl From<KeyPress> for DefaultBehavior {
+    fn from(value: KeyPress) -> Self {
+        Self::KeyPress(value)
+    }
 }

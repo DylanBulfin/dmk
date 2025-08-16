@@ -79,20 +79,37 @@ macro_rules! evec {
 /// than individual KeyUp/KeyDown events
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum SpecialEvent {
-    Tap(Key),
+    TapBehavior(DefaultBehavior),
 }
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Event {
-    KeyEvent(KeyEvent),
+    /// Corresponds to either a physical button press on the keyboard or the output of another
+    /// behavior (e.g. a layer/tap would generate a momentary layer switch)
     BehaviorKeyEvent(BehaviorKeyEvent),
+    /// Corresponds to a keypress output of a behavior (such as the keypress behavior)
+    KeyEvent(KeyEvent),
     LayerEvent(LayerEvent),
     SpecialEvent(SpecialEvent),
     None,
 }
 
 impl Event {
+    pub fn bkey_up(behavior: DefaultBehavior) -> Self {
+        Self::BehaviorKeyEvent(BehaviorKeyEvent {
+            behavior,
+            is_press: false,
+        })
+    }
+
+    pub fn bkey_down(behavior: DefaultBehavior) -> Self {
+        Self::BehaviorKeyEvent(BehaviorKeyEvent {
+            behavior,
+            is_press: true,
+        })
+    }
+
     pub fn key_up(key: Key) -> Self {
         Self::KeyEvent(KeyEvent {
             key,
@@ -107,8 +124,8 @@ impl Event {
         })
     }
 
-    pub fn special_tap(key: Key) -> Self {
-        Self::SpecialEvent(SpecialEvent::Tap(key))
+    pub fn special_tap(behavior: DefaultBehavior) -> Self {
+        Self::SpecialEvent(SpecialEvent::TapBehavior(behavior))
     }
 }
 

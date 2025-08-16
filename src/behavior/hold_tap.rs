@@ -1,7 +1,7 @@
 //! Hold-tap, a fundamental behavior in any keyboard firmware
 
 use crate::{
-    behavior::Behavior,
+    behavior::{Behavior, DefaultBehavior, key_press::KeyPress},
     evec,
     event::{EVec, Event},
     key::Key,
@@ -12,7 +12,7 @@ use crate::{
 pub struct HoldTap {
     decided_hold: bool,
     decided_tap: bool,
-    hold: Key,
+    hold: &'b DefaultBehavior,
     tap: Key,
     hold_while_undecided: bool,
     duration: Duration,
@@ -40,9 +40,12 @@ impl Behavior for HoldTap {
 
             if self.hold_while_undecided {
                 // Release hold and send special tap
-                evec![Event::key_up(self.hold), Event::special_tap(self.tap)]
+                evec![
+                    Event::key_up(self.hold),
+                    Event::special_tap(KeyPress::new(self.tap).into())
+                ]
             } else {
-                evec![Event::special_tap(self.tap)]
+                evec![Event::special_tap(KeyPress::new(self.tap).into())]
             }
         }
     }
@@ -104,7 +107,10 @@ mod tests {
         assert_eq!(ht2.on_press(&KeyState {}), evec![Event::key_down(Key::H)]);
         assert_eq!(
             ht2.on_release(&KeyState {}),
-            evec![Event::key_up(Key::H), Event::special_tap(Key::T)]
+            evec![
+                Event::key_up(Key::H),
+                Event::special_tap(KeyPress::new(Key::T).into())
+            ]
         );
         assert_eq!(ht2.after_delay(&KeyState {}), evec![]);
         assert_eq!(ht2.try_get_delay(), Some(Duration::new(0)));

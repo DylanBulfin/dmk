@@ -11,6 +11,12 @@ pub struct KeyPress {
     key: Key,
 }
 
+impl KeyPress {
+    pub fn new(key: Key) -> Self {
+        Self { key }
+    }
+}
+
 impl Behavior for KeyPress {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         evec![Event::key_down(self.key)]
