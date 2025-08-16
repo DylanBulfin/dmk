@@ -1,15 +1,17 @@
 use crate::{
     behavior::Behavior,
     evec,
-    event::{EVec, Event, Key, KeyEvent},
+    event::{EVec, Event, KeyEvent},
+    key::Key,
     timer::Duration,
 };
 
-pub struct KeyPressBehavior {
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct KeyPress {
     key: Key,
 }
 
-impl Behavior for KeyPressBehavior {
+impl Behavior for KeyPress {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         evec![Event::key_down(self.key)]
     }
@@ -24,5 +26,26 @@ impl Behavior for KeyPressBehavior {
 
     fn after_delay(&mut self, _ks: &super::KeyState) -> EVec {
         evec![]
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_key_press() {
+        let mut kp = KeyPress { key: Key::A };
+
+        assert_eq!(
+            kp.on_press(&crate::behavior::KeyState {}),
+            evec![Event::key_down(kp.key)]
+        );
+        assert_eq!(
+            kp.on_release(&crate::behavior::KeyState {}),
+            evec![Event::key_up(kp.key)]
+        );
+        assert_eq!(kp.try_get_delay(), None);
+        assert_eq!(kp.after_delay(&crate::behavior::KeyState {}), evec![]);
     }
 }

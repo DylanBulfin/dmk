@@ -8,11 +8,16 @@ pub struct Instant {
     nanoseconds: u64,
 }
 
+#[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Duration {
     nanoseconds: u64,
 }
 
 impl Duration {
+    pub fn new(nanoseconds: u64) -> Self {
+        Self { nanoseconds }
+    }
+
     pub fn from_micros(micros: u64) -> Self {
         Self {
             nanoseconds: micros * 1000,

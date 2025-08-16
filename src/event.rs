@@ -1,14 +1,72 @@
+use core::ops::Index;
+
+use crate::{
+    behavior::{Behavior, DefaultBehavior},
+    key::Key,
+};
+
 pub const EVEC_LEN: usize = 5;
 
-/// This type represents the return type of a behavior
-pub type EVec = [Event; EVEC_LEN];
+#[derive(Debug, Clone, PartialEq)]
+pub struct EVec {
+    arr: [Event; EVEC_LEN],
+    len: usize,
+}
+
+impl EVec {
+    pub fn new() -> Self {
+        Self {
+            arr: [Event::None; EVEC_LEN],
+            len: 0,
+        }
+    }
+
+    pub fn push(&mut self, event: Event) {
+        if self.len < EVEC_LEN {
+            self.arr[self.len] = event;
+            self.len += 1;
+        } else {
+            panic!("Trying to add event to EVec at max size")
+        }
+    }
+
+    /// Pops a value from the *back* of the EVec, returns None if empty
+    pub fn pop(&mut self) -> Option<Event> {
+        if self.len == 0 {
+            None
+        } else {
+            self.len -= 1;
+
+            let res = self.arr[self.len];
+            self.arr[self.len] = Event::None;
+
+            Some(res)
+        }
+    }
+
+    pub fn len(&self) -> usize {
+        self.len
+    }
+}
+
+impl Index<usize> for EVec {
+    type Output = Event;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= self.len {
+            panic!("Attempted to access past end of array")
+        } else {
+            &self.arr[index]
+        }
+    }
+}
 
 #[macro_export]
 macro_rules! evec {
     [$($elem:expr),*] => {{
-        let mut base = [crate::event::Event::None; crate::event::EVEC_LEN];
-        for (i, elem) in [$($elem),*].into_iter().enumerate() {
-            base[i] = elem;
+        let mut base = crate::event::EVec::new();
+        for elem in [$($elem),*]{
+            base.push(elem);
         }
 
         base
@@ -16,10 +74,11 @@ macro_rules! evec {
 }
 
 /// These are the kind of special events that can happen. The initial usecase is to allow key
-/// presses to send taps specifically. For example, if retro-tap is on the hold_tap behavior needs
-/// to be able to trigger a tap with a single event.
+/// presses to send taps specifically. For example, if a hold-tap on_release method is called and
+/// the timeout has not expired, the on_release method needs to trigger a full tap of a key rather
+/// than individual KeyUp/KeyDown events
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SpecialEventKind {
+pub enum SpecialEvent {
     Tap(Key),
 }
 
@@ -27,8 +86,9 @@ pub enum SpecialEventKind {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum Event {
     KeyEvent(KeyEvent),
+    BehaviorKeyEvent(BehaviorKeyEvent),
     LayerEvent(LayerEvent),
-    SpecialEvent(SpecialEventKind),
+    SpecialEvent(SpecialEvent),
     None,
 }
 
@@ -46,115 +106,10 @@ impl Event {
             is_press: true,
         })
     }
-}
 
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Key {
-    // Alphas
-    A,
-    B,
-    C,
-    D,
-    E,
-    F,
-    G,
-    H,
-    I,
-    J,
-    K,
-    L,
-    M,
-    N,
-    O,
-    P,
-    Q,
-    R,
-    S,
-    T,
-    U,
-    V,
-    W,
-    X,
-    Y,
-    Z,
-
-    // Numbers
-    N1,
-    N2,
-    N3,
-    N4,
-    N5,
-    N6,
-    N7,
-    N8,
-    N9,
-    N0,
-
-    // Mods
-    LALT,
-    RALT,
-    LGUI,
-    RGUI,
-    LCTL,
-    RCTL,
-    LSFT,
-    RSFT,
-
-    // Directions
-    UP,
-    DOWN,
-    LEFT,
-    RIGHT,
-
-    // Function Keys
-    F1,
-    F2,
-    F3,
-    F4,
-    F5,
-    F6,
-    F7,
-    F8,
-    F9,
-    F10,
-    F11,
-    F12,
-    F13,
-    F14,
-    F15,
-    F16,
-    F17,
-    F18,
-    F19,
-    F20,
-    F21,
-    F22,
-    F23,
-    F24,
-
-    // Nav Keys
-    HOME,
-    END,
-    PGDN,
-    PGUP,
-
-    // Symbols
-    DOT,
-    COMMA,
-    BTICK,
-    FSLASH,
-    BSLASH,
-    DASH,
-    EQUAL,
-    LBRACK,
-    RBRACK,
-
-    // Control
-    SPACE,
-    ENTER,
-    BSPACE,
-    DEL,
-    ESC,
+    pub fn special_tap(key: Key) -> Self {
+        Self::SpecialEvent(SpecialEvent::Tap(key))
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -167,6 +122,12 @@ impl From<KeyEvent> for Event {
     fn from(value: KeyEvent) -> Self {
         Self::KeyEvent(value)
     }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct BehaviorKeyEvent {
+    pub behavior: DefaultBehavior,
+    pub is_press: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
