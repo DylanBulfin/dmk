@@ -8,12 +8,12 @@ use crate::{
 pub const EVEC_LEN: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EVec {
-    arr: [Event; EVEC_LEN],
+pub struct EVec<'b> {
+    arr: [Event<'b>; EVEC_LEN],
     len: usize,
 }
 
-impl EVec {
+impl<'b> EVec<'b> {
     pub fn new() -> Self {
         Self {
             arr: [Event::None; EVEC_LEN],
@@ -21,7 +21,7 @@ impl EVec {
         }
     }
 
-    pub fn push(&mut self, event: Event) {
+    pub fn push(&mut self, event: Event<'b>) {
         if self.len < EVEC_LEN {
             self.arr[self.len] = event;
             self.len += 1;
@@ -49,8 +49,8 @@ impl EVec {
     }
 }
 
-impl Index<usize> for EVec {
-    type Output = Event;
+impl<'b> Index<usize> for EVec<'b> {
+    type Output = Event<'b>;
 
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
@@ -78,32 +78,32 @@ macro_rules! evec {
 /// the timeout has not expired, the on_release method needs to trigger a full tap of a key rather
 /// than individual KeyUp/KeyDown events
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SpecialEvent {
-    TapBehavior(DefaultBehavior),
+pub enum SpecialEvent<'b> {
+    TapBehavior(DefaultBehavior<'b>),
 }
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Event {
+pub enum Event<'b> {
     /// Corresponds to either a physical button press on the keyboard or the output of another
     /// behavior (e.g. a layer/tap would generate a momentary layer switch)
-    BehaviorKeyEvent(BehaviorKeyEvent),
+    BehaviorKeyEvent(BehaviorKeyEvent<'b>),
     /// Corresponds to a keypress output of a behavior (such as the keypress behavior)
     KeyEvent(KeyEvent),
     LayerEvent(LayerEvent),
-    SpecialEvent(SpecialEvent),
+    SpecialEvent(SpecialEvent<'b>),
     None,
 }
 
-impl Event {
-    pub fn bkey_up(behavior: DefaultBehavior) -> Self {
+impl<'b> Event<'b> {
+    pub fn bkey_up(behavior: DefaultBehavior<'b>) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: false,
         })
     }
 
-    pub fn bkey_down(behavior: DefaultBehavior) -> Self {
+    pub fn bkey_down(behavior: DefaultBehavior<'b>) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: true,
@@ -124,7 +124,7 @@ impl Event {
         })
     }
 
-    pub fn special_tap(behavior: DefaultBehavior) -> Self {
+    pub fn special_tap(behavior: DefaultBehavior<'b>) -> Self {
         Self::SpecialEvent(SpecialEvent::TapBehavior(behavior))
     }
 }
@@ -135,22 +135,22 @@ pub struct KeyEvent {
     pub is_press: bool,
 }
 
-impl From<KeyEvent> for Event {
+impl<'b> From<KeyEvent> for Event<'b> {
     fn from(value: KeyEvent) -> Self {
         Self::KeyEvent(value)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BehaviorKeyEvent {
-    pub behavior: DefaultBehavior,
+pub struct BehaviorKeyEvent<'b> {
+    pub behavior: DefaultBehavior<'b>,
     pub is_press: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LayerEvent {}
 
-impl From<LayerEvent> for Event {
+impl<'b> From<LayerEvent> for Event<'b> {
     fn from(value: LayerEvent) -> Self {
         Self::LayerEvent(value)
     }

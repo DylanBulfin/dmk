@@ -20,18 +20,18 @@ pub trait Behavior {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum DefaultBehavior {
-    HoldTap(HoldTap),
+pub enum DefaultBehavior<'b> {
+    HoldTap(HoldTap<'b>),
     KeyPress(KeyPress),
 }
 
-impl From<HoldTap> for DefaultBehavior {
-    fn from(value: HoldTap) -> Self {
-        Self::HoldTap(value)
+impl<'b> From<&'b HoldTap<'b>> for DefaultBehavior<'b> {
+    fn from(value: &'b HoldTap) -> Self {
+        Self::HoldTap(value.clone())
     }
 }
 
-impl From<KeyPress> for DefaultBehavior {
+impl<'b> From<KeyPress> for DefaultBehavior<'b> {
     fn from(value: KeyPress) -> Self {
         Self::KeyPress(value)
     }

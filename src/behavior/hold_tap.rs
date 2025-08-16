@@ -9,19 +9,19 @@ use crate::{
 };
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct HoldTap {
+pub struct HoldTap<'b> {
     decided_hold: bool,
     decided_tap: bool,
-    hold: &'b DefaultBehavior,
-    tap: Key,
+    hold: &'b DefaultBehavior<'b>,
+    tap: &'b DefaultBehavior<'b>,
     hold_while_undecided: bool,
     duration: Duration,
 }
 
-impl Behavior for HoldTap {
+impl<'b> Behavior for HoldTap<'b> {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         if self.hold_while_undecided {
-            evec![Event::key_down(self.hold)]
+            evec![Event::bkey_down(self.hold.clone())]
         } else {
             evec![Event::None]
         }
@@ -33,7 +33,7 @@ impl Behavior for HoldTap {
             panic!("Shouldn't happen currently (until support for bilateral combinations is added)")
         } else if self.decided_hold {
             // decided_hold set means delay expired and after_delay fired. Release hold now
-            evec![Event::key_up(self.hold)]
+            evec![Event::bkey_up(self.hold.clone())]
         } else {
             // Released before timeout, is tap
             self.decided_tap = true;
@@ -41,11 +41,11 @@ impl Behavior for HoldTap {
             if self.hold_while_undecided {
                 // Release hold and send special tap
                 evec![
-                    Event::key_up(self.hold),
-                    Event::special_tap(KeyPress::new(self.tap).into())
+                    Event::bkey_up(self.hold.clone()),
+                    Event::special_tap(self.tap.clone())
                 ]
             } else {
-                evec![Event::special_tap(KeyPress::new(self.tap).into())]
+                evec![Event::special_tap(self.tap.clone())]
             }
         }
     }
@@ -65,7 +65,7 @@ impl Behavior for HoldTap {
                 // If hold_while_undecided is set, hold key event is already sent
                 evec![]
             } else {
-                evec![Event::key_down(self.hold)]
+                evec![Event::bkey_down(self.hold.clone())]
             }
         }
     }
@@ -79,17 +79,20 @@ mod tests {
 
     #[test]
     fn test_hold_tap() {
+        let kp_t = KeyPress::new(Key::T).into();
+        let kp_h = KeyPress::new(Key::H).into();
+
         let mut ht1 = HoldTap {
-            hold: Key::H,
-            tap: Key::T,
+            hold: &kp_h,
+            tap: &kp_t,
             hold_while_undecided: true,
             decided_tap: false,
             decided_hold: false,
             duration: Duration::new(0),
         };
         let mut ht2 = HoldTap {
-            hold: Key::H,
-            tap: Key::T,
+            hold: &kp_h,
+            tap: &kp_t,
             hold_while_undecided: true,
             decided_tap: false,
             decided_hold: false,
@@ -97,18 +100,18 @@ mod tests {
         };
 
         // Test timeout expired
-        assert_eq!(ht1.on_press(&KeyState {}), evec![Event::key_down(Key::H)]);
+        assert_eq!(ht1.on_press(&KeyState {}), evec![Event::bkey_down(kp_h)]);
         assert_eq!(ht1.after_delay(&KeyState {}), evec![]);
-        assert_eq!(ht1.on_release(&KeyState {}), evec![Event::key_up(Key::H)]);
+        assert_eq!(ht1.on_release(&KeyState {}), evec![Event::bkey_up(kp_h)]);
         assert_eq!(ht1.try_get_delay(), Some(Duration::new(0)));
         assert!(ht1.decided_hold);
         assert!(!ht1.decided_tap);
 
-        assert_eq!(ht2.on_press(&KeyState {}), evec![Event::key_down(Key::H)]);
+        assert_eq!(ht2.on_press(&KeyState {}), evec![Event::bkey_down(kp_h)]);
         assert_eq!(
             ht2.on_release(&KeyState {}),
             evec![
-                Event::key_up(Key::H),
+                Event::bkey_up(kp_h),
                 Event::special_tap(KeyPress::new(Key::T).into())
             ]
         );

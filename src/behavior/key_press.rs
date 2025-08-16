@@ -45,11 +45,11 @@ mod tests {
 
         assert_eq!(
             kp.on_press(&crate::behavior::KeyState {}),
-            evec![Event::key_down(kp.key)]
+            evec![Event::key_down(Key::A)]
         );
         assert_eq!(
             kp.on_release(&crate::behavior::KeyState {}),
-            evec![Event::key_up(kp.key)]
+            evec![Event::key_up(Key::A)]
         );
         assert_eq!(kp.try_get_delay(), None);
         assert_eq!(kp.after_delay(&crate::behavior::KeyState {}), evec![]);
