@@ -5,6 +5,8 @@ use crate::{
     key::Key,
 };
 
+pub mod queue;
+
 pub const EVEC_LEN: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
