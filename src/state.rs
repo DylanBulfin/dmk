@@ -6,7 +6,7 @@ use crate::{
     layer::{Layer, LayerStack},
     physical_layout::{MAX_KEYS, PhysicalLayout},
     timer::{Duration, Timer, TimerQueue, TimerTrigger, TimerTriggerData},
-    virtual_board::VirtualKeyboard,
+    vboard::VirtualKeyboard,
 };
 
 pub struct State<P, C, T>
@@ -23,7 +23,7 @@ where
     timer_state: TimerState<T>,
 }
 
-pub struct PhysicalState<P>
+struct PhysicalState<P>
 where
     P: PhysicalLayout,
 {
@@ -31,7 +31,7 @@ where
     last_state: [bool; MAX_KEYS],
 }
 
-pub struct TimerState<T>
+struct TimerState<T>
 where
     T: Timer,
 {
@@ -39,6 +39,7 @@ where
     queue: TimerQueue,
 }
 
+/// Time to hold a key when the state manager is simulating a tap
 pub const TAP_DURATION_MS: u64 = 100;
 
 impl<P, C, T> State<P, C, T>
@@ -58,6 +59,7 @@ where
         }
     }
 
+    /// Execute a single event depending on the type
     pub fn handle_event(&mut self, event: Event) {
         match event {
             Event::BehaviorKeyEvent(mut bke) => {
@@ -102,6 +104,8 @@ where
         }
     }
 
+    /// Check for any timer events in the timer queue that should be triggered at this Instant, and
+    /// trigger their after_delay methods
     pub fn handle_timer_events(&mut self) {
         while let Some(event) = self.timer_state.queue.peek_front()
             && event.time <= self.timer_state.timer.as_instant()
@@ -117,6 +121,8 @@ where
         }
     }
 
+    /// Check the state of each physical key in the configured layout, and generate
+    /// BehaviorKeyUp/BehaviorKeyDown behaviors for newly released/pressed keys
     pub fn handle_physical_key_state(&mut self) {
         let curr_state = self.phys_state.layout.get_arr_copy();
 

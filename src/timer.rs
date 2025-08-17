@@ -7,6 +7,8 @@ use core::ops::Add;
 use crate::{behavior::DefaultBehavior, event::Event};
 
 #[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
+/// Represents a specific point in time, relative to the monotonic hardware clock configured for
+/// this board.
 pub struct Instant {
     microseconds: u64,
 }
@@ -18,6 +20,7 @@ impl Instant {
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
+/// Represents a specific length of time
 pub struct Duration {
     microseconds: u64,
 }
@@ -52,6 +55,9 @@ impl Add<Duration> for Instant {
     }
 }
 
+/// Represents a time that can be used as a hardware timer by dmk. Most likely this will use a
+/// hardware timer register or timer interrupts supported by whatever controller the board uses.
+/// ***MUST BE MONOTONIC*** for correct functioning
 pub trait Timer {
     fn microseconds(&self) -> u64;
 
@@ -68,12 +74,16 @@ pub trait Timer {
 
 pub const TIMER_QUEUE_LEN: usize = 100;
 
+/// Represents a configured trigger to put in the TimerQueue. Has a point in time at which it
+/// will trigger and the data needed to trigger.
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TimerTrigger {
     pub time: Instant,
     pub data: TimerTriggerData,
 }
 
+/// TimerTriggers can target either a DefaultBehavior (calling the after_delay method) or an event
+/// (adding to the queue)
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TimerTriggerData {
     Behavior(DefaultBehavior),
@@ -96,8 +106,8 @@ impl TimerTrigger {
     }
 }
 
-/// This structure should always be sorted by TimerEvent::time. so that popping an element from the
-/// front will always return it in the correct place.
+/// This structure should always be sorted by TimerTrigger::time. so that popping an element from the
+/// front will always return the next trigger in time.
 pub struct TimerQueue {
     arr: [Option<TimerTrigger>; TIMER_QUEUE_LEN],
     len: usize,
@@ -111,6 +121,7 @@ impl TimerQueue {
         }
     }
 
+    /// Insert this TimerTrigger at the correct point in the backing array
     pub fn insert(&mut self, elem: TimerTrigger) {
         if self.len == TIMER_QUEUE_LEN {
             panic!("Attempt to add to a full timer queue");
@@ -142,6 +153,7 @@ impl TimerQueue {
         self.len += 1;
     }
 
+    /// Pop the first element (the next trigger)
     pub fn pop_front(&mut self) -> Option<TimerTrigger> {
         if self.len == 0 {
             None
@@ -165,6 +177,7 @@ impl TimerQueue {
         }
     }
 
+    /// Obtain a reference to the next trigger
     pub fn peek_front(&self) -> Option<&TimerTrigger> {
         if self.len == 0 {
             None

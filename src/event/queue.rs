@@ -2,6 +2,8 @@ use crate::event::{EVec, Event};
 
 pub const EVENT_QUEUE_LEN: usize = 100;
 
+/// This is a queue type with a statically-sized backing array. It is implemented in a circular
+/// fashion.
 pub struct EventQueue {
     events: [Option<Event>; EVENT_QUEUE_LEN],
     cursor: usize,
@@ -9,6 +11,7 @@ pub struct EventQueue {
 }
 
 impl EventQueue {
+    /// Create a new EventQueue with len of 0
     pub fn new() -> Self {
         Self {
             events: [None; EVENT_QUEUE_LEN],
@@ -17,6 +20,7 @@ impl EventQueue {
         }
     }
 
+    /// Add an Event to the back of the queue
     pub fn push_back(&mut self, event: Event) {
         if self.len >= EVENT_QUEUE_LEN {
             panic!("Tried to push to full event queue");
@@ -28,6 +32,7 @@ impl EventQueue {
         self.len += 1;
     }
 
+    /// Try to remove an Event from the front of the queue, returning None if empty
     pub fn pop_front(&mut self) -> Option<Event> {
         let res = self.events[self.cursor].take();
 
@@ -48,6 +53,7 @@ impl EventQueue {
         res
     }
 
+    /// Push the elements of the EVec onto the queue in order
     pub fn push_evec(&mut self, evec: EVec) {
         for event in evec {
             self.push_back(event);

@@ -7,15 +7,20 @@ use crate::{behavior::DefaultBehavior, key::Key};
 
 pub mod queue;
 
+/// The length of the backing structure of the EVec type. This should be large enough to hold the
+/// most events returned from any configured behavior.
 pub const EVEC_LEN: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
+/// A special, growable collection type with a statically-sized backing array. Used for storing the
+/// events that a behavior callback method returns.
 pub struct EVec {
     arr: [Event; EVEC_LEN],
     len: usize,
 }
 
 impl EVec {
+    /// Create a new EVec with no initialized elements
     pub fn new() -> Self {
         Self {
             arr: [Event::None; EVEC_LEN],
@@ -23,6 +28,7 @@ impl EVec {
         }
     }
 
+    /// Push element to the back of the array, growing len. Will panic if EVec is full
     pub fn push_back(&mut self, event: Event) {
         if self.len < EVEC_LEN {
             self.arr[self.len] = event;
@@ -46,6 +52,7 @@ impl EVec {
         }
     }
 
+    /// Returns the length of this Vec (in terms of actual initialized elements)
     pub fn len(&self) -> usize {
         self.len
     }
@@ -85,6 +92,8 @@ impl IntoIterator for EVec {
     }
 }
 
+/// An iterator adaptor for an EVec. Goes from the beginning to the end, returning only initialized
+/// elements
 pub struct EVecIter {
     base: EVec,
     cursor: usize,
@@ -105,9 +114,22 @@ impl Iterator for EVecIter {
 }
 
 #[macro_export]
+/// This is a convenience macro for the EVec type.
+///
+/// # Examples
+/// ```
+/// use dmk::evec;
+/// use dmk::event::Event;
+/// use dmk::behavior::key_press::KeyPress;
+/// use dmk::key::Key;
+///
+/// let evec = evec![Event::key_up(Key::A), Event::key_down(Key::B),
+/// Event::special_tap(KeyPress::new(Key::A).into())];
+/// assert_eq!(evec.len(), 3);
+/// ```
 macro_rules! evec {
     [$($elem:expr),*] => {{
-        let mut base = crate::event::EVec::new();
+        let mut base = $crate::event::EVec::new();
         for elem in [$($elem),*]{
             base.push_back(elem);
         }
@@ -133,12 +155,14 @@ pub enum Event {
     BehaviorKeyEvent(BehaviorKeyEvent),
     /// Corresponds to a keypress output of a behavior (such as the keypress behavior)
     KeyEvent(KeyEvent),
+    /// A layer add/removal event
     LayerEvent(LayerEvent),
     SpecialEvent(SpecialEvent),
     None,
 }
 
 impl Event {
+    /// A BehaviorKeyDown event
     pub fn bkey_up(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
@@ -146,6 +170,7 @@ impl Event {
         })
     }
 
+    /// A BehaviorKeyDown event
     pub fn bkey_down(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
@@ -153,6 +178,7 @@ impl Event {
         })
     }
 
+    /// A KeyUp event
     pub fn key_up(key: Key) -> Self {
         Self::KeyEvent(KeyEvent {
             key,
@@ -160,6 +186,7 @@ impl Event {
         })
     }
 
+    /// A KeyUp event
     pub fn key_down(key: Key) -> Self {
         Self::KeyEvent(KeyEvent {
             key,
@@ -167,6 +194,7 @@ impl Event {
         })
     }
 
+    /// Special behavior initiating a quick tap of this behavior
     pub fn special_tap(behavior: DefaultBehavior) -> Self {
         Self::SpecialEvent(SpecialEvent::TapBehavior(behavior))
     }
@@ -184,12 +212,23 @@ impl From<KeyEvent> for Event {
     }
 }
 
+/// This type of event represents the beginning or end of a (possibly virtual) button press that
+/// corresponds to a specific behavior. In the simplest case, a key configured with a KeyPress
+/// behavior, when pressed, will generate a BehaviorKeyDown event. This BehaviorKeyDown event, when
+/// processed by the state manager, will generate a KeyDown event. Then when the physical key is
+/// released the state manager will send a BehaviorKeyUp event for this behavior, which will in
+/// turn generate a KeyUp event.
+///
+/// Representing it in this way means I can have behaviors trigger other behaviors
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BehaviorKeyEvent {
     pub behavior: DefaultBehavior,
     pub is_press: bool,
 }
 
+/// This type of event represents a change to the active layers of the keyboard. Generally this
+/// will take the form of either adding or removing a layer from the stack but could be extended in
+/// the future
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum LayerEvent {
     AddLayer(usize),

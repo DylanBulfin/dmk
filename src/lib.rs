@@ -7,4 +7,4 @@ pub mod layer;
 pub mod physical_layout;
 pub mod state;
 pub mod timer;
-pub mod virtual_board;
+pub mod vboard;
