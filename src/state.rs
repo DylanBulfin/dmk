@@ -1,7 +1,7 @@
 use core::ops::Index;
 
 use crate::{
-    behavior::{Behavior, DefaultBehavior, KeyState, NoArgBehavior},
+    behavior::{Behavior, KeyState},
     event::{Event, LayerEvent, SpecialEvent, queue::EventQueue},
     layer::{Layer, LayerStack},
     physical_layout::{MAX_KEYS, PhysicalLayout},
@@ -39,7 +39,7 @@ where
     queue: TimerQueue,
 }
 
-pub const TAP_DURATION_MS: u32 = 100;
+pub const TAP_DURATION_MS: u64 = 100;
 
 impl<P, C, T> State<P, C, T>
 where

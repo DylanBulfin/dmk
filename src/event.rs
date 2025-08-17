@@ -3,10 +3,7 @@ use core::{
     ops::{Index, IndexMut},
 };
 
-use crate::{
-    behavior::{Behavior, DefaultBehavior},
-    key::Key,
-};
+use crate::{behavior::DefaultBehavior, key::Key};
 
 pub mod queue;
 
@@ -207,7 +204,7 @@ impl From<LayerEvent> for Event {
 
 #[cfg(test)]
 mod tests {
-    use crate::event::{EVEC_LEN, Event, Key, KeyEvent};
+    use crate::event::{EVEC_LEN, Event, Key};
 
     #[test]
     fn test_evec_macro() {

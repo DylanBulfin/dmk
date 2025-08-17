@@ -2,39 +2,42 @@
 //! this is to define the system time as a number of nanoseconds since boot. Not all controllers
 //! will have that level of precision but it should provide flexibility
 
-use core::{mem, ops::Add};
+use core::ops::Add;
 
-use crate::{
-    behavior::{self, DefaultBehavior},
-    event::Event,
-};
+use crate::{behavior::DefaultBehavior, event::Event};
 
-#[derive(Debug, PartialEq, Eq, PartialOrd, Ord)]
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Clone, Copy)]
 pub struct Instant {
-    microseconds: u32,
+    microseconds: u64,
+}
+
+impl Instant {
+    pub fn new(microseconds: u64) -> Self {
+        Self { microseconds }
+    }
 }
 
 #[derive(Debug, Copy, Clone, PartialEq)]
 pub struct Duration {
-    microseconds: u32,
+    microseconds: u64,
 }
 
 impl Duration {
-    pub fn new(microseconds: u32) -> Self {
+    pub fn new(microseconds: u64) -> Self {
         Self { microseconds }
     }
 
-    pub fn from_millis(millis: u32) -> Self {
+    pub fn from_millis(millis: u64) -> Self {
         Self {
             microseconds: millis * 1000,
         }
     }
 
-    pub fn millis(&self) -> u32 {
+    pub fn millis(&self) -> u64 {
         self.microseconds / 1000
     }
 
-    pub fn micros(&self) -> u32 {
+    pub fn micros(&self) -> u64 {
         self.microseconds
     }
 }
@@ -50,7 +53,7 @@ impl Add<Duration> for Instant {
 }
 
 pub trait Timer {
-    fn microseconds(&self) -> u32;
+    fn microseconds(&self) -> u64;
 
     fn as_instant(&self) -> Instant {
         Instant {
@@ -65,11 +68,13 @@ pub trait Timer {
 
 pub const TIMER_QUEUE_LEN: usize = 100;
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub struct TimerTrigger {
     pub time: Instant,
     pub data: TimerTriggerData,
 }
 
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TimerTriggerData {
     Behavior(DefaultBehavior),
     Event(Event),
@@ -99,6 +104,13 @@ pub struct TimerQueue {
 }
 
 impl TimerQueue {
+    pub fn new() -> Self {
+        Self {
+            arr: [None; _],
+            len: 0,
+        }
+    }
+
     pub fn insert(&mut self, elem: TimerTrigger) {
         if self.len == TIMER_QUEUE_LEN {
             panic!("Attempt to add to a full timer queue");
@@ -113,7 +125,7 @@ impl TimerQueue {
 
             if let Some(te) = &self.arr[i] {
                 if te.time > elem.time {
-                    break 1;
+                    break i;
                 }
             } else {
                 panic!("Unexpected None in TimerQueue")
@@ -127,6 +139,7 @@ impl TimerQueue {
         }
 
         self.arr[spot] = Some(elem);
+        self.len += 1;
     }
 
     pub fn pop_front(&mut self) -> Option<TimerTrigger> {
@@ -163,5 +176,51 @@ impl TimerQueue {
                 )
             }))
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        event::Event,
+        key::Key,
+        timer::{Instant, TimerQueue, TimerTrigger},
+    };
+
+    #[test]
+    fn test_timer_queue() {
+        let te1 = TimerTrigger::event(Instant::new(100), Event::key_down(Key::A));
+        let te2 = TimerTrigger::event(Instant::new(200), Event::key_down(Key::B));
+        let te3 = TimerTrigger::event(Instant::new(400), Event::key_down(Key::B));
+
+        let mut timer_queue = TimerQueue::new();
+        let mut exp_arr = timer_queue.arr;
+
+        assert_eq!(timer_queue.len, 0);
+        assert_eq!(timer_queue.arr, exp_arr);
+
+        timer_queue.insert(te2);
+        exp_arr[0] = Some(te2);
+
+        assert_eq!(timer_queue.len, 1);
+        assert_eq!(timer_queue.arr, exp_arr);
+
+        timer_queue.insert(te3);
+        exp_arr[1] = Some(te3);
+
+        assert_eq!(timer_queue.len, 2);
+        assert_eq!(timer_queue.arr, exp_arr);
+
+        timer_queue.insert(te1);
+        exp_arr[2] = exp_arr[1];
+        exp_arr[1] = exp_arr[0];
+        exp_arr[0] = Some(te1);
+
+        assert_eq!(timer_queue.len, 3);
+        assert_eq!(timer_queue.arr, exp_arr);
+
+        assert_eq!(timer_queue.pop_front(), Some(te1));
+        assert_eq!(timer_queue.pop_front(), Some(te2));
+        assert_eq!(timer_queue.pop_front(), Some(te3));
     }
 }

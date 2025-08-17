@@ -1,10 +1,9 @@
 //! Hold-tap, a fundamental behavior in any keyboard firmware
 
 use crate::{
-    behavior::{Behavior, DefaultBehavior, NoArgBehavior, key_press::KeyPress},
+    behavior::{Behavior, NoArgBehavior},
     evec,
     event::{EVec, Event},
-    key::Key,
     timer::Duration,
 };
 
@@ -80,7 +79,7 @@ impl Behavior for HoldTap {
 
 #[cfg(test)]
 mod tests {
-    use crate::behavior::KeyState;
+    use crate::{behavior::{key_press::KeyPress, KeyState}, key::Key};
 
     use super::*;
 

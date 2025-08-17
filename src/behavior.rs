@@ -4,7 +4,7 @@ pub mod key_press;
 use crate::{
     behavior::{hold_tap::HoldTap, key_press::KeyPress},
     evec,
-    event::{EVec, Event},
+    event::EVec,
     timer::Duration,
 };
 

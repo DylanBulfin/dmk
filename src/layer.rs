@@ -1,10 +1,10 @@
 //! A layer is a mapping over all keys in a physical layout
 
-use core::{char::MAX, ops::Index};
+use core::ops::Index;
 
 use crate::{
     behavior::{DefaultBehavior, NoArgBehavior},
-    physical_layout::{self, MAX_KEYS, PhysicalLayout},
+    physical_layout::{self, PhysicalLayout},
 };
 
 /// Maximum layers that can be active in the stack at once
@@ -168,8 +168,8 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        behavior::{Behavior, NoArgBehavior, key_press::KeyPress},
-        key::Key,
+        behavior::{key_press::KeyPress, NoArgBehavior},
+        key::Key, physical_layout::MAX_KEYS,
     };
 
     use super::*;

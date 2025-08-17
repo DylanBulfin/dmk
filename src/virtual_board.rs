@@ -1,10 +1,7 @@
 //! This module contains the model for an idealized standard keyboard. That is, it contains all
 //! valid keys in valid states (pressed or unpressed)
 
-use crate::{
-    event::{Event, KeyEvent},
-    key::Key,
-};
+use crate::{event::KeyEvent, key::Key};
 
 pub struct VirtualKeyboard {
     pub locks: Locks,

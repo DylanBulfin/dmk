@@ -1,7 +1,7 @@
 use crate::{
     behavior::Behavior,
     evec,
-    event::{EVec, Event, KeyEvent},
+    event::{EVec, Event},
     key::Key,
     timer::Duration,
 };
