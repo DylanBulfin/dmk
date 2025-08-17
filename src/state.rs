@@ -1,10 +1,10 @@
-use core::ops::Index;
+use core::{marker::PhantomData, ops::Index};
 
 use crate::{
-    behavior::{Behavior, KeyState},
+    behavior::{Behavior, DefaultBehavior, KeyState},
     event::{Event, LayerEvent, SpecialEvent, queue::EventQueue},
     layer::{Layer, LayerStack},
-    physical_layout::{MAX_KEYS, PhysicalLayout},
+    physical_layout::{HeldKeyCollection, MAX_KEYS, PhysicalLayout},
     timer::{Duration, Timer, TimerQueue, TimerTrigger, TimerTriggerData},
     vboard::VirtualKeyboard,
 };
@@ -12,10 +12,10 @@ use crate::{
 pub struct State<P, C, T>
 where
     P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
     T: Timer,
 {
-    layer_state: LayerStack<P, C>,
+    layer_stack: LayerStack<C>,
     phys_state: PhysicalState<P>,
     virtual_board: VirtualKeyboard,
     event_queue: EventQueue,
@@ -29,6 +29,7 @@ where
 {
     layout: P,
     last_state: [bool; MAX_KEYS],
+    held_keys: HeldKeyCollection,
 }
 
 struct TimerState<T>
@@ -45,17 +46,46 @@ pub const TAP_DURATION_MS: u64 = 100;
 impl<P, C, T> State<P, C, T>
 where
     P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
     T: Timer,
 {
+    pub fn new(layers: C, layout: P, timer: T) -> Self {
+        let layer_stack = LayerStack::new(layers);
+        let phys_state = PhysicalState {
+            layout,
+            last_state: [false; MAX_KEYS],
+            held_keys: HeldKeyCollection::new(),
+        };
+        let virtual_board = VirtualKeyboard::default();
+        let event_queue = EventQueue::new();
+        let key_state = KeyState {};
+        let timer_state = TimerState {
+            timer,
+            queue: TimerQueue::new(),
+        };
+
+        Self {
+            layer_stack,
+            phys_state,
+            virtual_board,
+            event_queue,
+            key_state,
+            timer_state,
+        }
+    }
+
+    pub fn main_iteration(&mut self) {
+        self.handle_timer_events();
+        // TODO consider whether to handle one event per loop instead
+        while let Some(event) = self.event_queue.pop_front() {
+            self.handle_event(event);
+        }
+        self.handle_physical_key_state();
+    }
+
     pub fn main_loop(&mut self) {
         loop {
-            self.handle_timer_events();
-            // TODO consider whether to handle one event per loop instead
-            while let Some(event) = self.event_queue.pop_front() {
-                self.handle_event(event);
-            }
-            self.handle_physical_key_state();
+            self.main_iteration();
         }
     }
 
@@ -84,8 +114,8 @@ where
                 self.virtual_board.apply_key_event(ke);
             }
             Event::LayerEvent(le) => match le {
-                LayerEvent::AddLayer(layer) => self.layer_state.push(layer),
-                LayerEvent::RemoveDownToLayer(layer) => self.layer_state.pop_until(layer),
+                LayerEvent::AddLayer(layer) => self.layer_stack.push(layer),
+                LayerEvent::RemoveDownToLayer(layer) => self.layer_stack.pop_until(layer),
             },
             Event::SpecialEvent(se) => match se {
                 SpecialEvent::TapBehavior(mut behavior) => {
@@ -130,15 +160,27 @@ where
             if curr_state[key] && !self.phys_state.last_state[key] {
                 // Key newly pressed
                 // TODO add debouncing, maybe new event type
-                let behavior = self.layer_state.find_key_behavior(key);
+                let behavior = self.layer_stack.find_key_behavior(key);
                 self.event_queue.push_back(Event::bkey_down(behavior));
             } else if !curr_state[key] && self.phys_state.last_state[key] {
                 // Newly released key
-                let behavior = self.layer_state.find_key_behavior(key);
+                let behavior = if let Some(beh) = self.phys_state.held_keys.try_remove_key(key) {
+                    beh
+                } else {
+                    panic!("Got release event of non-held key");
+                };
                 self.event_queue.push_back(Event::bkey_up(behavior));
             }
         }
 
         self.phys_state.last_state = curr_state;
+    }
+
+    pub fn get_vboard(&self) -> &VirtualKeyboard {
+        &self.virtual_board
+    }
+
+    pub fn get_phys_layout_mut(&mut self) -> &mut P {
+        &mut self.phys_state.layout
     }
 }

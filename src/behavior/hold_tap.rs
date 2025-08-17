@@ -24,10 +24,28 @@ pub struct HoldTap {
     duration: Duration,
 }
 
+impl HoldTap {
+    pub fn new(
+        hold: NoArgBehavior,
+        tap: NoArgBehavior,
+        duration: Duration,
+        hold_while_undecided: bool,
+    ) -> Self {
+        Self {
+            decided_hold: false,
+            decided_tap: false,
+            hold,
+            tap,
+            hold_while_undecided,
+            duration,
+        }
+    }
+}
+
 impl Behavior for HoldTap {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         if self.hold_while_undecided {
-            evec![Event::bkey_down(self.hold.clone().into())]
+            evec![Event::bkey_down(None, self.hold.clone().into())]
         } else {
             evec![Event::None]
         }
@@ -39,7 +57,7 @@ impl Behavior for HoldTap {
             panic!("Shouldn't happen currently (until support for bilateral combinations is added)")
         } else if self.decided_hold {
             // decided_hold set means delay expired and after_delay fired. Release hold now
-            evec![Event::bkey_up(self.hold.clone().into())]
+            evec![Event::bkey_up(None, self.hold.clone().into())]
         } else {
             // Released before timeout, is tap
             self.decided_tap = true;
@@ -47,7 +65,7 @@ impl Behavior for HoldTap {
             if self.hold_while_undecided {
                 // Release hold and send special tap
                 evec![
-                    Event::bkey_up(self.hold.clone().into()),
+                    Event::bkey_up(None, self.hold.clone().into()),
                     Event::special_tap(self.tap.clone().into())
                 ]
             } else {
@@ -71,7 +89,7 @@ impl Behavior for HoldTap {
                 // If hold_while_undecided is set, hold key event is already sent
                 evec![]
             } else {
-                evec![Event::bkey_down(self.hold.clone().into())]
+                evec![Event::bkey_down(None, self.hold.clone().into())]
             }
         }
     }
@@ -79,7 +97,10 @@ impl Behavior for HoldTap {
 
 #[cfg(test)]
 mod tests {
-    use crate::{behavior::{key_press::KeyPress, KeyState}, key::Key};
+    use crate::{
+        behavior::{KeyState, key_press::KeyPress},
+        key::Key,
+    };
 
     use super::*;
 

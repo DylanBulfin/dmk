@@ -3,17 +3,20 @@
 
 use crate::{event::KeyEvent, key::Key};
 
+#[derive(Debug, Default)]
 pub struct VirtualKeyboard {
     pub locks: Locks,
     pub keys: VirtualKeys,
 }
 
+#[derive(Debug, Default)]
 pub struct Locks {
     pub scroll_lock: bool,
     pub num_lock: bool,
     pub caps_lock: bool,
 }
 
+#[derive(Debug, Default)]
 pub struct VirtualKeys {
     // Alphas
     pub a: bool,

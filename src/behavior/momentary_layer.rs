@@ -9,6 +9,12 @@ pub struct MomentaryLayer {
     layer: usize,
 }
 
+impl MomentaryLayer {
+    pub fn new(layer: usize) -> Self {
+        Self { layer }
+    }
+}
+
 impl Behavior for MomentaryLayer {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         evec![Event::LayerEvent(LayerEvent::AddLayer(self.layer))]

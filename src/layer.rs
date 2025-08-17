@@ -10,21 +10,22 @@ use crate::{
 /// Maximum layers that can be active in the stack at once
 pub const MAX_LAYERS: usize = 10;
 
-#[derive(Debug, Clone)]
-pub struct Layer<P>
-where
-    P: PhysicalLayout,
-{
-    layout: P,
-    behaviors: [DefaultBehavior; physical_layout::MAX_KEYS],
+#[derive(Debug)]
+pub struct Layer {
+    keys: usize,
+    behaviors: [Option<DefaultBehavior>; physical_layout::MAX_KEYS],
 }
 
-impl<P> Layer<P>
-where
-    P: PhysicalLayout,
-{
-    pub fn get_behavior(&self, key: usize) -> DefaultBehavior {
-        if key >= self.layout.keys() {
+impl Layer {
+    pub fn new(
+        keys: usize,
+        behaviors: [Option<DefaultBehavior>; physical_layout::MAX_KEYS],
+    ) -> Self {
+        Self { keys, behaviors }
+    }
+
+    pub fn get_behavior(&self, key: usize) -> Option<DefaultBehavior> {
+        if key >= self.keys {
             panic!("Attempt to access nonexistent key")
         }
 
@@ -33,10 +34,9 @@ where
 }
 
 #[derive(Debug)]
-pub struct LayerStack<P, C>
+pub struct LayerStack<C>
 where
-    P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
 {
     all_layers: C,
     base_layer: usize,
@@ -44,12 +44,20 @@ where
     len: usize,
 }
 
-impl<P, C> LayerStack<P, C>
+impl<C> LayerStack<C>
 where
-    P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
 {
-    pub fn iter(&self) -> LayerStackIter<'_, P, C> {
+    pub fn new(all_layers: C) -> Self {
+        Self {
+            all_layers,
+            base_layer: 0,
+            layers: [None; MAX_LAYERS],
+            len: 0,
+        }
+    }
+
+    pub fn iter(&self) -> LayerStackIter<'_, C> {
         LayerStackIter {
             stack: &self,
             len: self.len,
@@ -91,8 +99,12 @@ where
 
     pub fn find_key_behavior(&self, key: usize) -> DefaultBehavior {
         for layer in self.iter() {
-            if layer.get_behavior(key) != NoArgBehavior::Transparent.into() {
-                return layer.get_behavior(key);
+            if let Some(behavior) = layer.get_behavior(key)
+                && behavior != NoArgBehavior::Transparent.into()
+            {
+                return layer
+                    .get_behavior(key)
+                    .expect("Attempted to get value of invalid key");
             }
         }
 
@@ -100,12 +112,11 @@ where
     }
 }
 
-impl<P, C> Index<usize> for LayerStack<P, C>
+impl<C> Index<usize> for LayerStack<C>
 where
-    P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
 {
-    type Output = Layer<P>;
+    type Output = Layer;
 
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
@@ -123,22 +134,20 @@ where
     }
 }
 
-pub struct LayerStackIter<'s, P, C>
+pub struct LayerStackIter<'s, C>
 where
-    P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
 {
-    stack: &'s LayerStack<P, C>,
+    stack: &'s LayerStack<C>,
     len: usize,
     index: usize,
 }
 
-impl<'s, P, C> Iterator for LayerStackIter<'s, P, C>
+impl<'s, C> Iterator for LayerStackIter<'s, C>
 where
-    P: PhysicalLayout,
-    C: Index<usize, Output = Layer<P>>,
+    C: Index<usize, Output = Layer>,
 {
-    type Item = &'s Layer<P>;
+    type Item = &'s Layer;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index > self.len {
@@ -168,8 +177,9 @@ where
 #[cfg(test)]
 mod tests {
     use crate::{
-        behavior::{key_press::KeyPress, NoArgBehavior},
-        key::Key, physical_layout::MAX_KEYS,
+        behavior::{NoArgBehavior, key_press::KeyPress},
+        key::Key,
+        physical_layout::MAX_KEYS,
     };
 
     use super::*;
@@ -199,31 +209,31 @@ mod tests {
             arr: [false; MAX_KEYS],
         };
 
-        let mut bb = [NoArgBehavior::None.into(); MAX_KEYS];
-        bb[0] = NoArgBehavior::KeyPress(KeyPress::new(Key::A)).into();
-        bb[1] = NoArgBehavior::KeyPress(KeyPress::new(Key::B)).into();
-        bb[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::C)).into();
+        let mut bb = [None; MAX_KEYS];
+        bb[0] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::A)).into());
+        bb[1] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::B)).into());
+        bb[2] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::C)).into());
 
-        let mut b1 = [NoArgBehavior::None.into(); MAX_KEYS];
-        b1[0] = NoArgBehavior::KeyPress(KeyPress::new(Key::D)).into();
-        b1[1] = NoArgBehavior::Transparent.into();
-        b1[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::F)).into();
+        let mut b1 = [None; MAX_KEYS];
+        b1[0] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::D)).into());
+        b1[1] = Some(NoArgBehavior::Transparent.into());
+        b1[2] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::F)).into());
 
-        let mut b2 = [NoArgBehavior::None.into(); MAX_KEYS];
-        b2[0] = NoArgBehavior::Transparent.into();
-        b2[1] = NoArgBehavior::Transparent.into();
-        b2[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::I)).into();
+        let mut b2 = [None; MAX_KEYS];
+        b2[0] = Some(NoArgBehavior::Transparent.into());
+        b2[1] = Some(NoArgBehavior::Transparent.into());
+        b2[2] = Some(NoArgBehavior::KeyPress(KeyPress::new(Key::I)).into());
 
         let bl = Layer {
-            layout,
+            keys: layout.keys(),
             behaviors: bb,
         };
         let l1 = Layer {
-            layout,
+            keys: layout.keys(),
             behaviors: b1,
         };
         let l2 = Layer {
-            layout,
+            keys: layout.keys(),
             behaviors: b2,
         };
 
