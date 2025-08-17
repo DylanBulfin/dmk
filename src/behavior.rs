@@ -3,6 +3,7 @@ pub mod key_press;
 
 use crate::{
     behavior::{hold_tap::HoldTap, key_press::KeyPress},
+    evec,
     event::{EVec, Event},
     timer::Duration,
 };
@@ -46,6 +47,8 @@ impl From<HoldTap> for ArgBehavior {
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub enum NoArgBehavior {
     KeyPress(KeyPress),
+    None,
+    Transparent,
 }
 
 impl From<KeyPress> for NoArgBehavior {
@@ -96,24 +99,28 @@ impl Behavior for NoArgBehavior {
     fn on_press(&mut self, ks: &KeyState) -> EVec {
         match self {
             NoArgBehavior::KeyPress(key_press) => key_press.on_press(ks),
+            _ => evec![],
         }
     }
 
     fn on_release(&mut self, ks: &KeyState) -> EVec {
         match self {
             NoArgBehavior::KeyPress(key_press) => key_press.on_release(ks),
+            _ => evec![],
         }
     }
 
     fn try_get_delay(&self) -> Option<Duration> {
         match self {
             NoArgBehavior::KeyPress(key_press) => key_press.try_get_delay(),
+            _ => None,
         }
     }
 
     fn after_delay(&mut self, ks: &KeyState) -> EVec {
         match self {
             NoArgBehavior::KeyPress(key_press) => key_press.after_delay(ks),
+            _ => evec![],
         }
     }
 }

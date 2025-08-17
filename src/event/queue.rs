@@ -1,4 +1,4 @@
-use crate::event::Event;
+use crate::event::{EVec, Event};
 
 pub const EVENT_QUEUE_LEN: usize = 100;
 
@@ -46,6 +46,12 @@ impl EventQueue {
         }
 
         res
+    }
+
+    pub fn push_evec(&mut self, evec: EVec) {
+        for event in evec {
+            self.push_back(event);
+        }
     }
 }
 

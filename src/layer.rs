@@ -1,6 +1,6 @@
 //! A layer is a mapping over all keys in a physical layout
 
-use core::char::MAX;
+use core::{char::MAX, ops::Index};
 
 use crate::{
     behavior::DefaultBehavior,
@@ -15,6 +15,7 @@ pub struct Layer<P>
 where
     P: PhysicalLayout,
 {
+    id: usize,
     layout: P,
     behaviors: [DefaultBehavior; physical_layout::MAX_KEYS],
 }
@@ -32,21 +33,25 @@ where
     }
 }
 
-pub struct LayerStack<P>
+pub struct LayerStack<P, C>
 where
     P: PhysicalLayout,
+    C: Index<usize, Output = Layer<P>>,
 {
-    layers: [Option<Layer<P>>; MAX_LAYERS],
+    all_layers: C,
+    base_layer: Layer<P>,
+    layers: [Option<usize>; MAX_LAYERS],
     len: usize,
 }
 
-impl<P> LayerStack<P>
+impl<P, C> LayerStack<P, C>
 where
     P: PhysicalLayout,
+    C: Index<usize, Output = Layer<P>>,
 {
-    pub fn iter(&self) -> LayerStackIter<'_, P> {
+    pub fn iter(&self) -> LayerStackIter<'_, P, C> {
         LayerStackIter {
-            stack: &self.layers,
+            stack: &self,
             len: self.len,
             index: 0,
         }
@@ -56,7 +61,7 @@ where
         self.len
     }
 
-    pub fn push(&mut self, layer: Layer<P>) {
+    pub fn push(&mut self, layer: usize) {
         if self.len >= MAX_LAYERS {
             panic!("Tried to add to a full layer stack");
         }
@@ -65,42 +70,77 @@ where
         self.len += 1;
     }
 
-    pub fn pop(&mut self) -> Option<Layer<P>> {
+    pub fn pop(&mut self) -> Option<usize> {
         if self.len == 0 {
-            panic!("Layer stack should never be completeyl empty")
-        } else if self.len == 1 {
             None
         } else {
             self.len -= 1;
             self.layers[self.len].take()
         }
     }
+
+    /// Pop layers off the stack until you have popped the indicated layer, and then stop.
+    /// INCLUSIVE
+    pub fn pop_until(&mut self, layer: usize) {
+        while let Some(l) = self.pop() {
+            if l == layer {
+                return;
+            }
+        }
+    }
 }
 
-pub struct LayerStackIter<'s, P>
+impl<P, C> Index<usize> for LayerStack<P, C>
 where
     P: PhysicalLayout,
+    C: Index<usize, Output = Layer<P>>,
 {
-    stack: &'s [Option<Layer<P>>; MAX_LAYERS],
+    type Output = Layer<P>;
+
+    fn index(&self, index: usize) -> &Self::Output {
+        if index >= self.len {
+            panic!(
+                "Out of bounds in LayerStack, len is {} and index is {}",
+                self.len, index
+            );
+        }
+        &self.all_layers[self.layers[index].unwrap_or_else(|| {
+            panic!(
+                "Unexpected none at index {} in LayerStack when len is {}",
+                index, self.len
+            )
+        })]
+    }
+}
+
+pub struct LayerStackIter<'s, P, C>
+where
+    P: PhysicalLayout,
+    C: Index<usize, Output = Layer<P>>,
+{
+    stack: &'s LayerStack<P, C>,
     len: usize,
     index: usize,
 }
 
-impl<'s, P> Iterator for LayerStackIter<'s, P>
+impl<'s, P, C> Iterator for LayerStackIter<'s, P, C>
 where
     P: PhysicalLayout,
+    C: Index<usize, Output = Layer<P>>,
 {
     type Item = &'s Layer<P>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.len {
+        if self.index >= self.len + 1 {
             None
+        } else if self.index == self.len {
+            let ret = Some(&self.stack.base_layer);
+            self.index += 1;
+            ret
         } else {
-            Some(
-                self.stack[self.index]
-                    .as_ref()
-                    .expect("Unexpectedly encountered None in layers where Some was expected"),
-            )
+            let ret = Some(&self.stack[self.index]);
+            self.index += 1;
+            ret
         }
     }
 }

@@ -194,7 +194,11 @@ pub struct BehaviorKeyEvent {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct LayerEvent {}
+pub enum LayerEvent {
+    AddLayer(usize),
+    RemoveDownToLayer(usize),
+
+}
 
 impl From<LayerEvent> for Event {
     fn from(value: LayerEvent) -> Self {
