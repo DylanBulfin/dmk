@@ -1,3 +1,5 @@
+use core::mem;
+
 use crate::behavior::DefaultBehavior;
 
 pub const MAX_KEYS: usize = 110; // An upper bound for the number of keys in a layout. 
@@ -10,9 +12,16 @@ pub trait PhysicalLayout {
 
 // TODO this is effectively the same thing as the EVec definition, I should eventually genericize
 // all these collections and maybe move to a new crate for reusability
+#[derive(Debug)]
 pub struct HeldKeyCollection {
     arr: [Option<(usize, DefaultBehavior)>; MAX_KEYS],
     len: usize,
+}
+
+#[derive(Debug)]
+pub struct HeldKeyIter<'a> {
+    collection: &'a HeldKeyCollection,
+    index: usize,
 }
 
 impl HeldKeyCollection {
@@ -30,6 +39,23 @@ impl HeldKeyCollection {
 
         self.arr[self.len] = Some((key, behavior));
         self.len += 1;
+    }
+
+    pub fn replace(&mut self, key: usize, behavior: DefaultBehavior) {
+        let mut spot = None;
+        for (i, (k, _)) in self.iter().enumerate() {
+            if k == &key {
+                spot = Some(i);
+            }
+        }
+        if let Some(spot) = spot {
+            self.arr[spot] = Some((key, behavior));
+        } else {
+            panic!(
+                "Failed to replace HeldKey entry, did not find it in, {:?} {:?}",
+                spot, behavior
+            );
+        }
     }
 
     pub fn remove(&mut self, index: usize) -> (usize, DefaultBehavior) {
@@ -64,5 +90,30 @@ impl HeldKeyCollection {
         }
 
         None
+    }
+
+    pub fn iter(&self) -> HeldKeyIter<'_> {
+        HeldKeyIter {
+            collection: &self,
+            index: 0,
+        }
+    }
+}
+
+impl<'a> Iterator for HeldKeyIter<'a> {
+    type Item = &'a (usize, DefaultBehavior);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.index >= self.collection.len {
+            None
+        } else {
+            let res = Some(
+                self.collection.arr[self.index]
+                    .as_ref()
+                    .expect("Unexpected None in HeldKeyCollection"),
+            );
+            self.index += 1;
+            res
+        }
     }
 }

@@ -12,9 +12,15 @@ use crate::{
 pub struct KeyState {}
 
 pub trait Behavior {
+    // Unique identifier for each behavior, allows easy detemination of which behaviors are held
+    // fn id(&self) -> u64;
+
     fn on_press(&mut self, ks: &KeyState) -> EVec;
 
     fn on_release(&mut self, ks: &KeyState) -> EVec;
+    // Add call_time arg which allows Behavior to statelessly determine whether the delay function
+    // has timed out, as long sa it takes the Instant of creation in its constructor
+    // fn on_release(&mut self, call_time: Instant, ks: &KeyState) -> EVec;
 
     fn try_get_delay(&self) -> Option<Duration>;
 

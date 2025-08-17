@@ -143,8 +143,19 @@ where
         {
             match event.data {
                 TimerTriggerData::Behavior(mut behavior) => {
+                    let mut target_key: Option<usize> = None;
+                    for (key, beh) in self.phys_state.held_keys.iter() {
+                        if beh == &behavior {
+                            target_key = Some(*key);
+                        }
+                    }
+
                     let events = behavior.after_delay(&self.key_state);
                     self.event_queue.push_evec(events);
+
+                    if let Some(key) = target_key {
+                        self.phys_state.held_keys.replace(key, behavior);
+                    }
                 }
                 TimerTriggerData::Event(event) => self.event_queue.push_back(event),
             }
@@ -162,6 +173,7 @@ where
                 // TODO add debouncing, maybe new event type
                 let behavior = self.layer_stack.find_key_behavior(key);
                 self.event_queue.push_back(Event::bkey_down(behavior));
+                self.phys_state.held_keys.push(key, behavior);
             } else if !curr_state[key] && self.phys_state.last_state[key] {
                 // Newly released key
                 let behavior = if let Some(beh) = self.phys_state.held_keys.try_remove_key(key) {

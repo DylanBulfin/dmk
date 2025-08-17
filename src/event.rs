@@ -163,20 +163,18 @@ pub enum Event {
 
 impl Event {
     /// A BehaviorKeyDown event
-    pub fn bkey_up(key: Option<usize>, behavior: DefaultBehavior) -> Self {
+    pub fn bkey_up(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: false,
-            key,
         })
     }
 
     /// A BehaviorKeyDown event
-    pub fn bkey_down(key: Option<usize>, behavior: DefaultBehavior) -> Self {
+    pub fn bkey_down(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: true,
-            key,
         })
     }
 
@@ -224,7 +222,6 @@ impl From<KeyEvent> for Event {
 /// Representing it in this way means I can have behaviors trigger other behaviors
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct BehaviorKeyEvent {
-    pub key: Option<usize>,
     pub behavior: DefaultBehavior,
     pub is_press: bool,
 }

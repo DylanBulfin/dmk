@@ -45,19 +45,22 @@ impl HoldTap {
 impl Behavior for HoldTap {
     fn on_press(&mut self, _ks: &super::KeyState) -> EVec {
         if self.hold_while_undecided {
-            evec![Event::bkey_down(None, self.hold.clone().into())]
+            evec![Event::bkey_down(self.hold.clone().into())]
         } else {
             evec![Event::None]
         }
     }
 
     fn on_release(&mut self, _ks: &super::KeyState) -> EVec {
+        // TODO this is broken because i can't pass state via Behaviors (they are passed around too
+        // freely). I may want to use the KeyState argument to pass in the held keys here.
+    
         // Behavior key is released, so we want to "unpress" whatever key has been sent
         if self.decided_tap {
             panic!("Shouldn't happen currently (until support for bilateral combinations is added)")
         } else if self.decided_hold {
             // decided_hold set means delay expired and after_delay fired. Release hold now
-            evec![Event::bkey_up(None, self.hold.clone().into())]
+            evec![Event::bkey_up(self.hold.clone().into())]
         } else {
             // Released before timeout, is tap
             self.decided_tap = true;
@@ -65,7 +68,7 @@ impl Behavior for HoldTap {
             if self.hold_while_undecided {
                 // Release hold and send special tap
                 evec![
-                    Event::bkey_up(None, self.hold.clone().into()),
+                    Event::bkey_up(self.hold.clone().into()),
                     Event::special_tap(self.tap.clone().into())
                 ]
             } else {
@@ -89,7 +92,7 @@ impl Behavior for HoldTap {
                 // If hold_while_undecided is set, hold key event is already sent
                 evec![]
             } else {
-                evec![Event::bkey_down(None, self.hold.clone().into())]
+                evec![Event::bkey_down( self.hold.clone().into())]
             }
         }
     }
