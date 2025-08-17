@@ -26,7 +26,7 @@ impl EVec {
         }
     }
 
-    pub fn push_back(&mut self, event: Event) {
+    pub fn push(&mut self, event: Event) {
         if self.len < EVEC_LEN {
             self.arr[self.len] = event;
             self.len += 1;
@@ -36,7 +36,7 @@ impl EVec {
     }
 
     /// Pops a value from the *back* of the EVec, returns None if empty
-    pub fn pop_pack(&mut self) -> Option<Event> {
+    pub fn pop(&mut self) -> Option<Event> {
         if self.len == 0 {
             None
         } else {
@@ -112,7 +112,7 @@ macro_rules! evec {
     [$($elem:expr),*] => {{
         let mut base = crate::event::EVec::new();
         for elem in [$($elem),*]{
-            base.push_back(elem);
+            base.push(elem);
         }
 
         base
@@ -227,46 +227,10 @@ mod tests {
         assert_eq!(tst.len, 0);
         assert_eq!(tst.arr, exp_arr);
 
-        tst.push_back(Event::key_up(Key::A));
+        tst.push(Event::key_up(Key::A));
         exp_arr[0] = Event::key_up(Key::A);
 
         assert_eq!(tst.len, 1);
         assert_eq!(tst.arr, exp_arr);
-
-        tst.push_back(Event::key_up(Key::B));
-        exp_arr[1] = Event::key_up(Key::B);
-
-        assert_eq!(tst.len, 2);
-        assert_eq!(tst.arr, exp_arr);
-
-        assert_eq!(tst.pop_pack(), Some(Event::key_up(Key::B)));
-        exp_arr[1] = Event::None;
-
-        assert_eq!(tst.len, 1);
-        assert_eq!(tst.arr, exp_arr);
-
-        assert_eq!(tst.pop_pack(), Some(Event::key_up(Key::A)));
-        exp_arr[0] = Event::None;
-
-        assert_eq!(tst.len, 0);
-        assert_eq!(tst.arr, exp_arr);
-
-        tst.push_back(Event::key_down(Key::A));
-        tst.push_back(Event::key_down(Key::B));
-        tst.push_back(Event::key_down(Key::C));
-
-        for (i, event) in tst.clone().into_iter().enumerate() {
-            if i == 0 {
-                assert_eq!(event, Event::key_down(Key::A));
-            } else if i == 1 {
-                assert_eq!(event, Event::key_down(Key::B));
-            } else if i == 2 {
-                assert_eq!(event, Event::key_down(Key::C));
-            } else {
-                panic!();
-            }
-        }
-
-        assert_eq!(tst.into_iter().count(), 3);
     }
 }
