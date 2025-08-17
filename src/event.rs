@@ -1,4 +1,7 @@
-use core::ops::Index;
+use core::{
+    mem,
+    ops::{Index, IndexMut},
+};
 
 use crate::{
     behavior::{Behavior, DefaultBehavior},
@@ -10,12 +13,12 @@ pub mod queue;
 pub const EVEC_LEN: usize = 5;
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct EVec<'b> {
-    arr: [Event<'b>; EVEC_LEN],
+pub struct EVec {
+    arr: [Event; EVEC_LEN],
     len: usize,
 }
 
-impl<'b> EVec<'b> {
+impl EVec {
     pub fn new() -> Self {
         Self {
             arr: [Event::None; EVEC_LEN],
@@ -23,7 +26,7 @@ impl<'b> EVec<'b> {
         }
     }
 
-    pub fn push(&mut self, event: Event<'b>) {
+    pub fn push(&mut self, event: Event) {
         if self.len < EVEC_LEN {
             self.arr[self.len] = event;
             self.len += 1;
@@ -51,14 +54,55 @@ impl<'b> EVec<'b> {
     }
 }
 
-impl<'b> Index<usize> for EVec<'b> {
-    type Output = Event<'b>;
+impl Index<usize> for EVec {
+    type Output = Event;
 
     fn index(&self, index: usize) -> &Self::Output {
         if index >= self.len {
             panic!("Attempted to access past end of array")
         } else {
             &self.arr[index]
+        }
+    }
+}
+
+impl IndexMut<usize> for EVec {
+    fn index_mut(&mut self, index: usize) -> &mut Self::Output {
+        if index >= self.len {
+            panic!("Attempted to access past end of array")
+        } else {
+            &mut self.arr[index]
+        }
+    }
+}
+
+impl IntoIterator for EVec {
+    type Item = Event;
+    type IntoIter = EVecIter;
+
+    fn into_iter(self) -> Self::IntoIter {
+        Self::IntoIter {
+            base: self,
+            cursor: 0,
+        }
+    }
+}
+
+pub struct EVecIter {
+    base: EVec,
+    cursor: usize,
+}
+
+impl Iterator for EVecIter {
+    type Item = Event;
+
+    fn next(&mut self) -> Option<Self::Item> {
+        if self.cursor < self.base.len {
+            let res = mem::replace(&mut self.base[self.cursor], Event::None);
+            self.cursor += 1;
+            Some(res)
+        } else {
+            None
         }
     }
 }
@@ -80,32 +124,32 @@ macro_rules! evec {
 /// the timeout has not expired, the on_release method needs to trigger a full tap of a key rather
 /// than individual KeyUp/KeyDown events
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum SpecialEvent<'b> {
-    TapBehavior(DefaultBehavior<'b>),
+pub enum SpecialEvent {
+    TapBehavior(DefaultBehavior),
 }
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub enum Event<'b> {
+pub enum Event {
     /// Corresponds to either a physical button press on the keyboard or the output of another
     /// behavior (e.g. a layer/tap would generate a momentary layer switch)
-    BehaviorKeyEvent(BehaviorKeyEvent<'b>),
+    BehaviorKeyEvent(BehaviorKeyEvent),
     /// Corresponds to a keypress output of a behavior (such as the keypress behavior)
     KeyEvent(KeyEvent),
     LayerEvent(LayerEvent),
-    SpecialEvent(SpecialEvent<'b>),
+    SpecialEvent(SpecialEvent),
     None,
 }
 
-impl<'b> Event<'b> {
-    pub fn bkey_up(behavior: DefaultBehavior<'b>) -> Self {
+impl Event {
+    pub fn bkey_up(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: false,
         })
     }
 
-    pub fn bkey_down(behavior: DefaultBehavior<'b>) -> Self {
+    pub fn bkey_down(behavior: DefaultBehavior) -> Self {
         Self::BehaviorKeyEvent(BehaviorKeyEvent {
             behavior,
             is_press: true,
@@ -126,7 +170,7 @@ impl<'b> Event<'b> {
         })
     }
 
-    pub fn special_tap(behavior: DefaultBehavior<'b>) -> Self {
+    pub fn special_tap(behavior: DefaultBehavior) -> Self {
         Self::SpecialEvent(SpecialEvent::TapBehavior(behavior))
     }
 }
@@ -137,22 +181,22 @@ pub struct KeyEvent {
     pub is_press: bool,
 }
 
-impl<'b> From<KeyEvent> for Event<'b> {
+impl From<KeyEvent> for Event {
     fn from(value: KeyEvent) -> Self {
         Self::KeyEvent(value)
     }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
-pub struct BehaviorKeyEvent<'b> {
-    pub behavior: DefaultBehavior<'b>,
+pub struct BehaviorKeyEvent {
+    pub behavior: DefaultBehavior,
     pub is_press: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq)]
 pub struct LayerEvent {}
 
-impl<'b> From<LayerEvent> for Event<'b> {
+impl From<LayerEvent> for Event {
     fn from(value: LayerEvent) -> Self {
         Self::LayerEvent(value)
     }

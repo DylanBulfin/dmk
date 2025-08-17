@@ -11,19 +11,19 @@ use crate::{
 pub const MAX_LAYERS: usize = 10;
 
 #[derive(Debug, Clone)]
-pub struct Layer<'b, P>
+pub struct Layer<P>
 where
     P: PhysicalLayout,
 {
     layout: P,
-    behaviors: [DefaultBehavior<'b>; physical_layout::MAX_KEYS],
+    behaviors: [DefaultBehavior; physical_layout::MAX_KEYS],
 }
 
-impl<'b, P> Layer<'b, P>
+impl<P> Layer<P>
 where
     P: PhysicalLayout,
 {
-    pub fn get_behavior(&self, key: usize) -> DefaultBehavior<'b> {
+    pub fn get_behavior(&self, key: usize) -> DefaultBehavior {
         if key >= self.layout.keys() {
             panic!("Attempt to access nonexistent key")
         }
@@ -32,19 +32,19 @@ where
     }
 }
 
-pub struct LayerStack<'b, P>
+pub struct LayerStack<P>
 where
     P: PhysicalLayout,
 {
-    layers: [Option<Layer<'b, P>>; MAX_LAYERS],
+    layers: [Option<Layer<P>>; MAX_LAYERS],
     len: usize,
 }
 
-impl<'b, P> LayerStack<'b, P>
+impl<P> LayerStack<P>
 where
     P: PhysicalLayout,
 {
-    pub fn iter(&self) -> LayerStackIter<'_, 'b, P> {
+    pub fn iter(&self) -> LayerStackIter<'_, P> {
         LayerStackIter {
             stack: &self.layers,
             len: self.len,
@@ -56,7 +56,7 @@ where
         self.len
     }
 
-    pub fn push(&mut self, layer: Layer<'b, P>) {
+    pub fn push(&mut self, layer: Layer<P>) {
         if self.len >= MAX_LAYERS {
             panic!("Tried to add to a full layer stack");
         }
@@ -65,7 +65,7 @@ where
         self.len += 1;
     }
 
-    pub fn pop(&mut self) -> Option<Layer<'b, P>> {
+    pub fn pop(&mut self) -> Option<Layer<P>> {
         if self.len == 0 {
             panic!("Layer stack should never be completeyl empty")
         } else if self.len == 1 {
@@ -77,20 +77,20 @@ where
     }
 }
 
-pub struct LayerStackIter<'s, 'b, P>
+pub struct LayerStackIter<'s, P>
 where
     P: PhysicalLayout,
 {
-    stack: &'s [Option<Layer<'b, P>>; MAX_LAYERS],
+    stack: &'s [Option<Layer<P>>; MAX_LAYERS],
     len: usize,
     index: usize,
 }
 
-impl<'s, 'b, P> Iterator for LayerStackIter<'s, 'b, P>
+impl<'s, P> Iterator for LayerStackIter<'s, P>
 where
     P: PhysicalLayout,
 {
-    type Item = &'s Layer<'b, P>;
+    type Item = &'s Layer<P>;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self.index >= self.len {
