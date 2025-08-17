@@ -3,7 +3,7 @@
 use core::{char::MAX, ops::Index};
 
 use crate::{
-    behavior::DefaultBehavior,
+    behavior::{DefaultBehavior, NoArgBehavior},
     physical_layout::{self, MAX_KEYS, PhysicalLayout},
 };
 
@@ -15,7 +15,6 @@ pub struct Layer<P>
 where
     P: PhysicalLayout,
 {
-    id: usize,
     layout: P,
     behaviors: [DefaultBehavior; physical_layout::MAX_KEYS],
 }
@@ -33,13 +32,14 @@ where
     }
 }
 
+#[derive(Debug)]
 pub struct LayerStack<P, C>
 where
     P: PhysicalLayout,
     C: Index<usize, Output = Layer<P>>,
 {
     all_layers: C,
-    base_layer: Layer<P>,
+    base_layer: usize,
     layers: [Option<usize>; MAX_LAYERS],
     len: usize,
 }
@@ -88,6 +88,16 @@ where
             }
         }
     }
+
+    pub fn find_key_behavior(&self, key: usize) -> DefaultBehavior {
+        for layer in self.iter() {
+            if layer.get_behavior(key) != NoArgBehavior::Transparent.into() {
+                return layer.get_behavior(key);
+            }
+        }
+
+        NoArgBehavior::None.into()
+    }
 }
 
 impl<P, C> Index<usize> for LayerStack<P, C>
@@ -131,16 +141,114 @@ where
     type Item = &'s Layer<P>;
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self.index >= self.len + 1 {
+        if self.index > self.len {
             None
-        } else if self.index == self.len {
-            let ret = Some(&self.stack.base_layer);
-            self.index += 1;
-            ret
         } else {
-            let ret = Some(&self.stack[self.index]);
+            let ret = if self.index == self.len {
+                // Base layer special case
+                Some(&self.stack.all_layers[self.stack.base_layer])
+            } else {
+                Some(
+                    &self.stack.all_layers[self.stack.layers[self.len - 1 - self.index]
+                        .unwrap_or_else(|| {
+                            panic!(
+                                "Unexpected None when parsing LayerStackIter, i: {}, len: {}",
+                                self.index, self.len
+                            )
+                        })],
+                )
+            };
+
             self.index += 1;
             ret
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::{
+        behavior::{Behavior, NoArgBehavior, key_press::KeyPress},
+        key::Key,
+    };
+
+    use super::*;
+
+    #[test]
+    fn test_layer_basics() {
+        #[derive(Clone, Copy, Debug)]
+        struct Layout {
+            arr: [bool; MAX_KEYS],
+        }
+
+        impl PhysicalLayout for Layout {
+            fn keys(&self) -> usize {
+                3
+            }
+
+            fn get_status(&self, key: usize) -> bool {
+                self.arr[key]
+            }
+
+            fn get_arr_copy(&self) -> [bool; MAX_KEYS] {
+                self.arr
+            }
+        }
+
+        let layout = Layout {
+            arr: [false; MAX_KEYS],
+        };
+
+        let mut bb = [NoArgBehavior::None.into(); MAX_KEYS];
+        bb[0] = NoArgBehavior::KeyPress(KeyPress::new(Key::A)).into();
+        bb[1] = NoArgBehavior::KeyPress(KeyPress::new(Key::B)).into();
+        bb[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::C)).into();
+
+        let mut b1 = [NoArgBehavior::None.into(); MAX_KEYS];
+        b1[0] = NoArgBehavior::KeyPress(KeyPress::new(Key::D)).into();
+        b1[1] = NoArgBehavior::Transparent.into();
+        b1[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::F)).into();
+
+        let mut b2 = [NoArgBehavior::None.into(); MAX_KEYS];
+        b2[0] = NoArgBehavior::Transparent.into();
+        b2[1] = NoArgBehavior::Transparent.into();
+        b2[2] = NoArgBehavior::KeyPress(KeyPress::new(Key::I)).into();
+
+        let bl = Layer {
+            layout,
+            behaviors: bb,
+        };
+        let l1 = Layer {
+            layout,
+            behaviors: b1,
+        };
+        let l2 = Layer {
+            layout,
+            behaviors: b2,
+        };
+
+        let mut layers = [None; MAX_LAYERS];
+        layers[0] = Some(1);
+        layers[1] = Some(2);
+
+        let stack = LayerStack {
+            all_layers: [bl, l1, l2],
+            base_layer: 0,
+            layers,
+            len: 2,
+        };
+
+        assert_eq!(
+            stack.find_key_behavior(0),
+            NoArgBehavior::KeyPress(KeyPress::new(Key::D)).into()
+        );
+        assert_eq!(
+            stack.find_key_behavior(1),
+            NoArgBehavior::KeyPress(KeyPress::new(Key::B)).into()
+        );
+        assert_eq!(
+            stack.find_key_behavior(2),
+            NoArgBehavior::KeyPress(KeyPress::new(Key::I)).into()
+        );
     }
 }

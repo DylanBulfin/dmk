@@ -117,28 +117,18 @@ where
         }
     }
 
-    fn find_key_behavior(&self, key: usize) -> DefaultBehavior {
-        for layer in self.layer_state.iter() {
-            if layer.get_behavior(key) != NoArgBehavior::Transparent.into() {
-                return layer.get_behavior(key);
-            }
-        }
-
-        NoArgBehavior::None.into()
-    }
-
     pub fn handle_physical_key_state(&mut self) {
-        let curr_state = self.phys_state.layout.get_arr_ref();
+        let curr_state = self.phys_state.layout.get_arr_copy();
 
         for key in 0..self.phys_state.layout.keys() {
             if curr_state[key] && !self.phys_state.last_state[key] {
                 // Key newly pressed
                 // TODO add debouncing, maybe new event type
-                let behavior = self.find_key_behavior(key);
+                let behavior = self.layer_state.find_key_behavior(key);
                 self.event_queue.push_back(Event::bkey_down(behavior));
             } else if !curr_state[key] && self.phys_state.last_state[key] {
                 // Newly released key
-                let behavior = self.find_key_behavior(key);
+                let behavior = self.layer_state.find_key_behavior(key);
                 self.event_queue.push_back(Event::bkey_up(behavior));
             }
         }
