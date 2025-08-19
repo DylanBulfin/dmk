@@ -50,7 +50,7 @@ where
     T: Timer,
 {
     pub fn new(layers: C, layout: P, timer: T) -> Self {
-        let layer_stack = LayerStack::new(layers);>
+        let layer_stack = LayerStack::new(layers);
         let phys_state = PhysicalState {
             layout,
             last_state: [false; MAX_KEYS],
