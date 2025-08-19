@@ -50,7 +50,7 @@ where
     T: Timer,
 {
     pub fn new(layers: C, layout: P, timer: T) -> Self {
-        let layer_stack = LayerStack::new(layers);
+        let layer_stack = LayerStack::new(layers);>
         let phys_state = PhysicalState {
             layout,
             last_state: [false; MAX_KEYS],
@@ -165,7 +165,7 @@ where
     /// Check the state of each physical key in the configured layout, and generate
     /// BehaviorKeyUp/BehaviorKeyDown behaviors for newly released/pressed keys
     pub fn handle_physical_key_state(&mut self) {
-        let curr_state = self.phys_state.layout.get_arr_copy();
+        let curr_state = self.phys_state.layout.get_keys(&self.timer_state.timer);
 
         for key in 0..self.phys_state.layout.keys() {
             if curr_state[key] && !self.phys_state.last_state[key] {

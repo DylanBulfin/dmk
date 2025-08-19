@@ -6,6 +6,8 @@
 //! provide a selection of algorithms for interpreting that as physical board (the usize index that
 //! is generally used to refer to keys differs by algorithm)
 
+use crate::{physical_layout::PhysicalLayout, scanning::ScanAlgorithm, timer::Timer};
+
 pub enum PinType {
     Input,
     Output,
@@ -21,22 +23,32 @@ pub trait PinSet {
     fn set_pin_input(&mut self, pin: usize);
     /// Make pin with index `pin` an output
     fn set_pin_output(&mut self, pin: usize);
-    /// Make pin with index `pin` active-high, e.g. treating high voltages as true logically
-    fn set_pin_active_high(&mut self, pin: usize);
-    /// Make pin with index `pin` active-high, e.g. treating high voltages as false logically
-    fn set_pin_active_low(&mut self, pin: usize);
-    /// Get logical state of input pin, depending on configuration (e.g. via `set_pin_active_low`,
-    /// which would make logical state the opposite of physical state)
+    /// Get logical state of input pin, //depending on is_active_high
     fn get_pin_state(&self, pin: usize) -> bool;
-    /// Get logical state of input pin, depending on configuration (e.g. via `set_pin_active_low`),
-    /// which would make logical state the opposite of physical state)
+    /// Get logical state of input pin, //depending on is_active_high
     fn set_pin_state(&mut self, pin: usize, state: bool);
+}
 
-    fn set_pin_active_bool(&mut self, pin: usize, active_val: bool) {
-        if active_val {
-            self.set_pin_active_high(pin);
-        } else {
-            self.set_pin_active_low(pin);
-        }
+pub struct ControllerLayout<P, A>
+where
+    P: PinSet,
+    A: ScanAlgorithm,
+{
+    keys: usize,
+    pins: P,
+    algorithm: A,
+}
+
+impl<P, A> PhysicalLayout for ControllerLayout<P, A>
+where
+    P: PinSet,
+    A: ScanAlgorithm,
+{
+    fn keys(&self) -> usize {
+        self.keys
+    }
+
+    fn get_keys(&mut self, timer: &impl Timer) -> [bool; crate::physical_layout::MAX_KEYS] {
+        self.algorithm.scan_pins(&mut self.pins, timer)
     }
 }

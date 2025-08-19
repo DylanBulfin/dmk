@@ -14,16 +14,6 @@ pub trait ScanAlgorithm {
 }
 
 #[derive(Debug, PartialEq)]
-pub enum MatrixScanKind {
-    /// This option means that the algorithm will set configured output pins high, and treat input
-    /// pins as active-high as well.
-    SetHigh,
-    /// This option means that the algorithm will set configured output pins low, and treat input
-    /// pins as active-low as well.
-    SetLow,
-}
-
-#[derive(Debug, PartialEq)]
 pub enum MatrixScanDirection {
     /// Rows are outputs, and columns are inputs. Equivalent of col2row in ZMK
     OutputRows,
@@ -32,7 +22,6 @@ pub enum MatrixScanDirection {
 }
 
 pub struct MatrixScanAlgorithm {
-    pub kind: MatrixScanKind,
     pub direction: MatrixScanDirection,
     pub row_pins: [Option<usize>; MAX_PINS],
     pub col_pins: [Option<usize>; MAX_PINS],
@@ -44,24 +33,20 @@ impl ScanAlgorithm for MatrixScanAlgorithm {
         match self.direction {
             MatrixScanDirection::OutputRows => {
                 while let Some(row) = self.row_pins[i] {
-                    pins.set_pin_active_bool(row, self.kind == MatrixScanKind::SetHigh);
                     pins.set_pin_output(row);
                     i += 1
                 }
                 while let Some(col) = self.col_pins[i] {
-                    pins.set_pin_active_bool(col, self.kind == MatrixScanKind::SetHigh);
                     pins.set_pin_input(col);
                     i += 1
                 }
             }
             MatrixScanDirection::OutputCols => {
                 while let Some(col) = self.row_pins[i] {
-                    pins.set_pin_active_bool(col, self.kind == MatrixScanKind::SetHigh);
                     pins.set_pin_output(col);
                     i += 1
                 }
                 while let Some(row) = self.col_pins[i] {
-                    pins.set_pin_active_bool(row, self.kind == MatrixScanKind::SetHigh);
                     pins.set_pin_input(row);
                     i += 1
                 }
