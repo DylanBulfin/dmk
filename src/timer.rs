@@ -70,6 +70,12 @@ pub trait Timer {
     fn add_duration(&self, duration: Duration) -> Instant {
         self.as_instant() + duration
     }
+
+    fn wait(&self, duration: Duration) {
+        let target = self.add_duration(duration);
+
+        while self.as_instant() < target {}
+    }
 }
 
 pub const TIMER_QUEUE_LEN: usize = 100;
