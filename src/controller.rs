@@ -24,7 +24,7 @@ pub trait PinSet {
     /// Make pin with index `pin` an output
     fn set_pin_output(&mut self, pin: usize);
     /// Get logical state of input pin, //depending on is_active_high
-    fn get_pin_state(&self, pin: usize) -> bool;
+    fn get_pin_state(&mut self, pin: usize) -> bool;
     /// Get logical state of input pin, //depending on is_active_high
     fn set_pin_state(&mut self, pin: usize, state: bool);
 }
@@ -37,6 +37,20 @@ where
     keys: usize,
     pins: P,
     algorithm: A,
+}
+
+impl<P, A> ControllerLayout<P, A>
+where
+    P: PinSet,
+    A: ScanAlgorithm,
+{
+    pub fn new(keys: usize, pins: P, algorithm: A) -> Self {
+        Self {
+            keys,
+            pins,
+            algorithm,
+        }
+    }
 }
 
 impl<P, A> PhysicalLayout for ControllerLayout<P, A>

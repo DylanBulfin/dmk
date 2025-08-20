@@ -20,7 +20,7 @@ where
     virtual_board: VirtualKeyboard,
     event_queue: EventQueue,
     key_state: KeyState,
-    timer_state: TimerState<T>,
+    pub timer_state: TimerState<T>,
 }
 
 struct PhysicalState<P>
@@ -32,11 +32,11 @@ where
     held_keys: HeldKeyCollection,
 }
 
-struct TimerState<T>
+pub struct TimerState<T>
 where
     T: Timer,
 {
-    timer: T,
+    pub timer: T,
     queue: TimerQueue,
 }
 

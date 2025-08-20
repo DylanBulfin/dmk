@@ -36,17 +36,19 @@ impl ScanAlgorithm for MatrixScanAlgorithm {
                     pins.set_pin_output(row);
                     i += 1
                 }
+                i = 0;
                 while let Some(col) = self.col_pins[i] {
                     pins.set_pin_input(col);
                     i += 1
                 }
             }
             MatrixScanDirection::OutputCols => {
-                while let Some(col) = self.row_pins[i] {
+                while let Some(col) = self.col_pins[i] {
                     pins.set_pin_output(col);
                     i += 1
                 }
-                while let Some(row) = self.col_pins[i] {
+                i = 0;
+                while let Some(row) = self.row_pins[i] {
                     pins.set_pin_input(row);
                     i += 1
                 }
@@ -69,7 +71,7 @@ impl ScanAlgorithm for MatrixScanAlgorithm {
             pins.set_pin_state(output, true);
 
             // Wait for debounce
-            timer.wait(Duration::new(10));
+            // timer.wait(Duration::new(10));
 
             let mut j = 0;
             while let Some(input) = self.get_input_pin_collection()[j] {
@@ -79,7 +81,9 @@ impl ScanAlgorithm for MatrixScanAlgorithm {
                 j += 1;
             }
 
-            i += 1
+            i += 1;
+
+            pins.set_pin_state(output, false);
         }
 
         keys
