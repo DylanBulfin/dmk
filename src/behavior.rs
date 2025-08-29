@@ -1,21 +1,16 @@
 use core::cell::Cell;
 
 use crate::{
-    event::{Event, KeyEvent, LayerEvent, SimpleBehaviorEvent, SimpleKeyEvent},
-    layer::Layer,
-    vboard::Key,
+    event::{Event, KeyEvent, LayerEvent, SimpleBehaviorEvent, SimpleKeyEvent}, layer::Layer, timer::Duration, vboard::Key
 };
-
-#[derive(Debug, Clone, Copy)]
-pub struct Duration {}
 
 pub trait BehaviorSimple {
     fn on_activate(&self) -> Option<Event>;
     fn on_deactivate(&self) -> Option<Event>;
 }
 pub trait BehaviorComplex {
-    fn on_activate(&mut self) -> Option<Event>;
-    fn on_deactivate(&mut self) -> Option<Event>;
+    fn on_press(&mut self) -> Option<Event>;
+    fn on_unpress(&mut self) -> Option<Event>;
     fn get_duration(&self) -> Option<Duration>;
     fn on_timeout(&mut self) -> Option<Event>;
 }
@@ -40,6 +35,25 @@ impl BehaviorSimple for SimpleBehavior {
             SimpleBehavior::KeyPress(b) => b.on_deactivate(),
             SimpleBehavior::MomentaryLayer(b) => b.on_deactivate(),
         }
+    }
+}
+// SimpleBehaviors can also be used in a manual context like any other, and need to implement the
+// trait
+impl BehaviorComplex for SimpleBehavior {
+    fn on_press(&mut self) -> Option<Event> {
+        self.on_activate()
+    }
+
+    fn on_unpress(&mut self) -> Option<Event> {
+        self.on_deactivate()
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        None
+    }
+
+    fn on_timeout(&mut self) -> Option<Event> {
+        None
     }
 }
 
@@ -73,15 +87,49 @@ impl BehaviorSimple for MomentaryLayerBehavior {
     }
 }
 
-pub enum ComplexBehavior {
+#[derive(Debug)]
+pub enum ManualBehavior {
     HoldTap(HoldTapBehavior),
+    Simple(SimpleBehavior),
 }
 
+impl BehaviorComplex for ManualBehavior {
+    fn on_press(&mut self) -> Option<Event> {
+        match self {
+            ManualBehavior::HoldTap(b) => b.on_press(),
+            ManualBehavior::Simple(b) => b.on_press(),
+        }
+    }
+
+    fn on_unpress(&mut self) -> Option<Event> {
+        match self {
+            ManualBehavior::HoldTap(b) => b.on_unpress(),
+            ManualBehavior::Simple(b) => b.on_unpress(),
+        }
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        match self {
+            ManualBehavior::HoldTap(b) => b.get_duration(),
+            ManualBehavior::Simple(b) => b.get_duration(),
+        }
+    }
+
+    fn on_timeout(&mut self) -> Option<Event> {
+        match self {
+            ManualBehavior::HoldTap(b) => b.on_timeout(),
+            ManualBehavior::Simple(b) => b.on_timeout(),
+        }
+    }
+}
+
+#[derive(Debug)]
 pub enum HoldTapBehaviorState {
     Pending,
     DecidedTap,
     DecidedHold,
 }
+#[derive(Debug)]
 pub struct HoldTapBehavior {
     state: HoldTapBehaviorState,
     hold: SimpleBehavior,
@@ -90,7 +138,7 @@ pub struct HoldTapBehavior {
     hold_while_undecided: bool,
 }
 impl BehaviorComplex for HoldTapBehavior {
-    fn on_activate(&mut self) -> Option<Event> {
+    fn on_press(&mut self) -> Option<Event> {
         if self.hold_while_undecided {
             Some(Event::BehaviorEvent(SimpleBehaviorEvent::StartBehavior(
                 self.hold,
@@ -100,7 +148,7 @@ impl BehaviorComplex for HoldTapBehavior {
         }
     }
 
-    fn on_deactivate(&mut self) -> Option<Event> {
+    fn on_unpress(&mut self) -> Option<Event> {
         match self.state {
             HoldTapBehaviorState::DecidedTap => {
                 panic!("Invalid state: DecidedTap encountered in on_deactivate")
