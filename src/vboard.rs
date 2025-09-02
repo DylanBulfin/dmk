@@ -1,15 +1,19 @@
 use num_enum::IntoPrimitive;
+use static_collections::List;
 
 pub const MAX_HELD_KEYS: usize = 20;
 
 pub struct KeyboardState {
-    held_keys: [Option<Key>; MAX_HELD_KEYS],
+    // Holds the keys that are held, and the manual behavior that caused it.
+    pub held_keys: List<(Key, usize), MAX_HELD_KEYS>,
 }
+
+pub const MAX_HELD_KEYS_PER_B: usize = 5;
 
 /// Virtual keyboard representation
 /// Designed to be compatible with usbd_human_interface_device Keyboard enum, which is in turn
 /// based on the USB specification
-#[derive(Debug, Clone, Copy, IntoPrimitive)]
+#[derive(Debug, Clone, Copy, IntoPrimitive, PartialEq, Eq)]
 #[repr(u8)]
 pub enum Key {
     A = 0x04,

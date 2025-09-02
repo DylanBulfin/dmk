@@ -1,18 +1,45 @@
 use core::cell::Cell;
 
 use crate::{
-    event::{Event, KeyEvent, LayerEvent, SimpleBehaviorEvent, SimpleKeyEvent}, layer::Layer, timer::Duration, vboard::Key
+    event::{BehaviorEvent, Event, EventData, KeyEvent, LayerEvent, SimpleKeyEvent},
+    layer::Layer,
+    timer::Duration,
+    vboard::Key,
 };
 
 pub trait BehaviorSimple {
     fn on_activate(&self) -> Option<Event>;
     fn on_deactivate(&self) -> Option<Event>;
+    fn behavior_id(&self) -> usize;
 }
 pub trait BehaviorComplex {
     fn on_press(&mut self) -> Option<Event>;
     fn on_unpress(&mut self) -> Option<Event>;
     fn get_duration(&self) -> Option<Duration>;
     fn on_timeout(&mut self) -> Option<Event>;
+    fn id(&self) -> usize;
+}
+
+impl BehaviorComplex for SimpleBehavior {
+    fn on_press(&mut self) -> Option<Event> {
+        self.on_activate()
+    }
+
+    fn on_unpress(&mut self) -> Option<Event> {
+        self.on_deactivate()
+    }
+
+    fn get_duration(&self) -> Option<Duration> {
+        None
+    }
+
+    fn on_timeout(&mut self) -> Option<Event> {
+        None
+    }
+
+    fn id(&self) -> usize {
+        self.behavior_id()
+    }
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -36,54 +63,66 @@ impl BehaviorSimple for SimpleBehavior {
             SimpleBehavior::MomentaryLayer(b) => b.on_deactivate(),
         }
     }
-}
-// SimpleBehaviors can also be used in a manual context like any other, and need to implement the
-// trait
-impl BehaviorComplex for SimpleBehavior {
-    fn on_press(&mut self) -> Option<Event> {
-        self.on_activate()
-    }
 
-    fn on_unpress(&mut self) -> Option<Event> {
-        self.on_deactivate()
-    }
-
-    fn get_duration(&self) -> Option<Duration> {
-        None
-    }
-
-    fn on_timeout(&mut self) -> Option<Event> {
-        None
+    fn behavior_id(&self) -> usize {
+        match self {
+            SimpleBehavior::KeyPress(e) => e.behavior_id(),
+            SimpleBehavior::MomentaryLayer(e) => e.behavior_id(),
+        }
     }
 }
 
 #[derive(Debug, Clone, Copy)]
-pub struct KeyPressBehavior(Key);
+pub struct KeyPressBehavior {
+    key: Key,
+    behavior_id: usize,
+}
+
 impl BehaviorSimple for KeyPressBehavior {
     fn on_activate(&self) -> Option<Event> {
-        Some(Event::KeyEvent(KeyEvent::Simple(SimpleKeyEvent::Press(
-            self.0,
-        ))))
+        Some(Event::new(
+            self.behavior_id,
+            EventData::KeyEvent(KeyEvent::Simple(SimpleKeyEvent::Press(self.key))),
+        ))
     }
 
     fn on_deactivate(&self) -> Option<Event> {
-        Some(Event::KeyEvent(KeyEvent::Simple(SimpleKeyEvent::Unpress(
-            self.0,
-        ))))
+        Some(Event::new(
+            self.behavior_id,
+            EventData::KeyEvent(KeyEvent::Simple(SimpleKeyEvent::Unpress(self.key))),
+        ))
+    }
+
+    fn behavior_id(&self) -> usize {
+        self.behavior_id
     }
 }
 
 #[derive(Debug, Clone, Copy)]
 /// Holds both "from" layer and "to" layer because when released, it needs to pop the layer
 /// stack down to the "from" layer.
-pub struct MomentaryLayerBehavior(Layer, Layer);
+pub struct MomentaryLayerBehavior {
+    layer_from: Layer,
+    layer_to: Layer,
+    behavior_id: usize,
+}
 impl BehaviorSimple for MomentaryLayerBehavior {
     fn on_activate(&self) -> Option<Event> {
-        Some(Event::LayerEvent(LayerEvent::AddLayer(self.1)))
+        Some(Event::new(
+            self.behavior_id,
+            EventData::LayerEvent(LayerEvent::AddLayer(self.layer_to)),
+        ))
     }
 
     fn on_deactivate(&self) -> Option<Event> {
-        Some(Event::LayerEvent(LayerEvent::RemoveToLayer(self.0)))
+        Some(Event::new(
+            self.behavior_id,
+            EventData::LayerEvent(LayerEvent::RemoveToLayer(self.layer_from)),
+        ))
+    }
+
+    fn behavior_id(&self) -> usize {
+        self.behavior_id
     }
 }
 
@@ -121,6 +160,13 @@ impl BehaviorComplex for ManualBehavior {
             ManualBehavior::Simple(b) => b.on_timeout(),
         }
     }
+
+    fn id(&self) -> usize {
+        match self {
+            ManualBehavior::HoldTap(b) => b.id(),
+            ManualBehavior::Simple(b) => b.behavior_id(),
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -131,18 +177,39 @@ pub enum HoldTapBehaviorState {
 }
 #[derive(Debug)]
 pub struct HoldTapBehavior {
+    id: usize,
     state: HoldTapBehaviorState,
     hold: SimpleBehavior,
     tap: SimpleBehavior,
     timeout: Duration,
     hold_while_undecided: bool,
 }
+
+impl HoldTapBehavior {
+    pub fn new(
+        hold: SimpleBehavior,
+        tap: SimpleBehavior,
+        timeout: Duration,
+        hold_while_undecided: bool,
+    ) -> Self {
+        Self {
+            id: get_behavior_id(),
+            state: HoldTapBehaviorState::Pending,
+            tap,
+            hold,
+            timeout,
+            hold_while_undecided,
+        }
+    }
+}
+
 impl BehaviorComplex for HoldTapBehavior {
     fn on_press(&mut self) -> Option<Event> {
         if self.hold_while_undecided {
-            Some(Event::BehaviorEvent(SimpleBehaviorEvent::StartBehavior(
-                self.hold,
-            )))
+            Some(Event::new(
+                self.id,
+                EventData::BehaviorEvent(BehaviorEvent::StartBehavior(self.hold)),
+            ))
         } else {
             None
         }
@@ -153,14 +220,26 @@ impl BehaviorComplex for HoldTapBehavior {
             HoldTapBehaviorState::DecidedTap => {
                 panic!("Invalid state: DecidedTap encountered in on_deactivate")
             }
-            HoldTapBehaviorState::DecidedHold => Some(Event::BehaviorEvent(
-                SimpleBehaviorEvent::EndBehavior(self.hold),
+            HoldTapBehaviorState::DecidedHold => Some(Event::new(
+                self.id,
+                EventData::BehaviorEvent(BehaviorEvent::EndBehavior(self.hold)),
             )),
             HoldTapBehaviorState::Pending => {
                 self.state = HoldTapBehaviorState::DecidedTap;
-                Some(Event::BehaviorEvent(SimpleBehaviorEvent::TapBehavior(
-                    self.tap,
-                )))
+
+                if self.hold_while_undecided {
+                    Some(Event::new(
+                        self.id,
+                        EventData::BehaviorEvent(BehaviorEvent::ReleaseTapBehavior(
+                            self.hold, self.tap,
+                        )),
+                    ))
+                } else {
+                    Some(Event::new(
+                        self.id,
+                        EventData::BehaviorEvent(BehaviorEvent::TapBehavior(self.tap)),
+                    ))
+                }
             }
         }
     }
@@ -177,17 +256,22 @@ impl BehaviorComplex for HoldTapBehavior {
                 if self.hold_while_undecided {
                     None
                 } else {
-                    Some(Event::BehaviorEvent(SimpleBehaviorEvent::StartBehavior(
-                        self.hold,
-                    )))
+                    Some(Event::new(
+                        self.id,
+                        EventData::BehaviorEvent(BehaviorEvent::StartBehavior(self.hold)),
+                    ))
                 }
             }
             _ => None,
         }
     }
+
+    fn id(&self) -> usize {
+        self.id
+    }
 }
 
-const BEHAVIOR_ID: Cell<usize> = Cell::new(0);
+const BEHAVIOR_ID: Cell<usize> = Cell::new(1);
 pub fn get_behavior_id() -> usize {
     let val = BEHAVIOR_ID.get();
     BEHAVIOR_ID.set(val + 1);
